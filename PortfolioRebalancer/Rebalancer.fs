@@ -83,7 +83,7 @@ let BalanceIndexAsync indexCacheFile stockDataCacheFile cash = async {
                     // Execute purchases
                     let updated, totalSpent =
                         purchaseCandidates
-                        |> List.fold (fun (accPositions, accSpent) (p, sharesToBuy, shareValue, commission, totalCost) ->
+                        |> List.fold (fun (accPositions, accSpent) (p, sharesToBuy, _, _, totalCost) ->
                             let newShares = p.ActualShares + sharesToBuy
                             let newActualValue = decimal newShares * p.CurrentPrice
                             let newCommission = calculateCommission p.CurrentPrice newShares
@@ -112,27 +112,26 @@ let BalanceIndexAsync indexCacheFile stockDataCacheFile cash = async {
 
 let private aggregateActions actions =
     let getActionKey = function
-        | RebalanceAction.Buy(symbol, _, _, _, _) -> ("Buy", symbol)
-        | RebalanceAction.Sell(symbol, _, _, _, _) -> ("Sell", symbol)
-        | RebalanceAction.Hold(symbol, _, _, _) -> ("Hold", symbol)
+        | Buy(symbol, _, _, _, _) -> "Buy", symbol
+        | Sell(symbol, _, _, _, _) -> "Sell", symbol
+        | Hold(symbol, _, _, _) -> "Hold", symbol
 
     let aggregateGroup (actionType, symbol) (grouped: RebalanceAction list) =
         match grouped.Head with
-        | RebalanceAction.Buy(_, unitPrice, _, _, _) ->
-            let totalShares = grouped |> List.sumBy (function RebalanceAction.Buy(_, _, shares, _, _) -> shares | _ -> 0)
-            let totalValue = grouped |> List.sumBy (function RebalanceAction.Buy(_, _, _, value, _) -> value | _ -> 0m)
-            let totalCommission = grouped |> List.sumBy (function RebalanceAction.Buy(_, _, _, _, commission) -> commission | _ -> 0m)
-            RebalanceAction.Buy(symbol, unitPrice, totalShares, totalValue, totalCommission)
-        | RebalanceAction.Sell(_, unitPrice, _, _, _) ->
-            let totalShares = grouped |> List.sumBy (function RebalanceAction.Sell(_, _, shares, _, _) -> shares | _ -> 0)
-            let totalValue = grouped |> List.sumBy (function RebalanceAction.Sell(_, _, _, value, _) -> value | _ -> 0m)
-            let totalCommission = grouped |> List.sumBy (function RebalanceAction.Sell(_, _, _, _, commission) -> commission | _ -> 0m)
-            RebalanceAction.Sell(symbol, unitPrice, totalShares, totalValue, totalCommission)
-        | RebalanceAction.Hold(_, unitPrice, _, _) ->
-            let totalShares = grouped |> List.sumBy (function RebalanceAction.Hold(_, _, shares, _) -> shares | _ -> 0)
-            let totalValue = grouped |> List.sumBy (function RebalanceAction.Hold(_, _, _, value) -> value | _ -> 0m)
-            RebalanceAction.Hold(symbol, unitPrice, totalShares, totalValue)
-        | _ -> failwith "Unexpected action type"
+        | Buy(_, unitPrice, _, _, _) ->
+            let totalShares = grouped |> List.sumBy (function Buy(_, _, shares, _, _) -> shares | _ -> 0)
+            let totalValue = grouped |> List.sumBy (function Buy(_, _, _, value, _) -> value | _ -> 0m)
+            let totalCommission = grouped |> List.sumBy (function Buy(_, _, _, _, commission) -> commission | _ -> 0m)
+            Buy(symbol, unitPrice, totalShares, totalValue, totalCommission)
+        | Sell(_, unitPrice, _, _, _) ->
+            let totalShares = grouped |> List.sumBy (function Sell(_, _, shares, _, _) -> shares | _ -> 0)
+            let totalValue = grouped |> List.sumBy (function Sell(_, _, _, value, _) -> value | _ -> 0m)
+            let totalCommission = grouped |> List.sumBy (function Sell(_, _, _, _, commission) -> commission | _ -> 0m)
+            Sell(symbol, unitPrice, totalShares, totalValue, totalCommission)
+        | Hold(_, unitPrice, _, _) ->
+            let totalShares = grouped |> List.sumBy (function Hold(_, _, shares, _) -> shares | _ -> 0)
+            let totalValue = grouped |> List.sumBy (function Hold(_, _, _, value) -> value | _ -> 0m)
+            Hold(symbol, unitPrice, totalShares, totalValue)
 
     actions
     |> List.groupBy getActionKey
@@ -184,7 +183,7 @@ let RebalanceCurrentPortfolioAsync indexCacheFile stockDataCacheFile currentPort
                 if p.Shares > 0 && price > 0m then
                     let value = decimal p.Shares * price
                     let commission = calculateCommission price p.Shares
-                    (RebalanceAction.Sell(p.Symbol, price, p.Shares, value, commission) :: actions, availableCash + value - commission)
+                    (Sell(p.Symbol, price, p.Shares, value, commission) :: actions, availableCash + value - commission)
                 else
                     (actions, availableCash)
             elif p.Shares > targetShares then
@@ -193,7 +192,7 @@ let RebalanceCurrentPortfolioAsync indexCacheFile stockDataCacheFile currentPort
                 if sharesToSell > 0 && price > 0m then
                     let value = decimal sharesToSell * price
                     let commission = calculateCommission price sharesToSell
-                    (RebalanceAction.Sell(p.Symbol, price, sharesToSell, value, commission) :: actions, availableCash + value - commission)
+                    (Sell(p.Symbol, price, sharesToSell, value, commission) :: actions, availableCash + value - commission)
                 else
                     (actions, availableCash)
             else
@@ -212,20 +211,20 @@ let RebalanceCurrentPortfolioAsync indexCacheFile stockDataCacheFile currentPort
             if sharesToBuy > 0 && price > 0m then
                 let value = decimal sharesToBuy * price
                 let commission = calculateCommission price sharesToBuy
-                Some (RebalanceAction.Buy(idx.Symbol, price, sharesToBuy, value, commission))
+                Some (Buy(idx.Symbol, price, sharesToBuy, value, commission))
             elif sharesToBuy = 0 && targetShares > 0 then
                 let value = decimal currentShares * price
-                Some (RebalanceAction.Hold(idx.Symbol, price, currentShares, value))
+                Some (Hold(idx.Symbol, price, currentShares, value))
             else
                 None)
 
     let totalBuyValueInit =
         buyActionsInit |> List.sumBy (function
-            | RebalanceAction.Buy(_, _, _, value, _) -> value
+            | Buy(_, _, _, value, _) -> value
             | _ -> 0m)
     let totalBuyCommissionInit =
         buyActionsInit |> List.sumBy (function
-            | RebalanceAction.Buy(_, _, _, _, commission) -> commission
+            | Buy(_, _, _, _, commission) -> commission
             | _ -> 0m)
 
     let mutable finalCash : decimal = cashAfterSells - totalBuyValueInit - totalBuyCommissionInit
@@ -241,7 +240,7 @@ let RebalanceCurrentPortfolioAsync indexCacheFile stockDataCacheFile currentPort
         sellActions
         |> List.fold (fun acc action ->
             match action with
-            | RebalanceAction.Sell(symbol, _, shares, _, _) ->
+            | Sell(symbol, _, shares, _, _) ->
                 let current = acc |> Map.tryFind symbol |> Option.defaultValue 0
                 let newShares = current - shares
                 if newShares > 0 then acc |> Map.add symbol newShares
@@ -254,7 +253,7 @@ let RebalanceCurrentPortfolioAsync indexCacheFile stockDataCacheFile currentPort
         buyActionsInit
         |> List.fold (fun acc action ->
             match action with
-            | RebalanceAction.Buy(symbol, _, shares, _, _) ->
+            | Buy(symbol, _, shares, _, _) ->
                 let current = acc |> Map.tryFind symbol |> Option.defaultValue 0
                 acc |> Map.add symbol (current + shares)
             | _ -> acc
@@ -336,7 +335,7 @@ let RebalanceCurrentPortfolioAsync indexCacheFile stockDataCacheFile currentPort
                         |> List.fold (fun (accPortfolio, accActions, accCash) (symbol, sharesToBuy, price, shareValue, commission, totalCost) ->
                             let current = accPortfolio |> Map.tryFind symbol |> Option.defaultValue 0
                             let updatedPortfolio = accPortfolio |> Map.add symbol (current + sharesToBuy)
-                            let updatedActions = RebalanceAction.Buy(symbol, price, sharesToBuy, shareValue, commission) :: accActions
+                            let updatedActions = Buy(symbol, price, sharesToBuy, shareValue, commission) :: accActions
                             let updatedCash = accCash - totalCost
                             (updatedPortfolio, updatedActions, updatedCash)
                         ) (portfolioMap, extraBuyActions, remainingCash)
@@ -354,16 +353,16 @@ let RebalanceCurrentPortfolioAsync indexCacheFile stockDataCacheFile currentPort
     let allBuyActions = buyActionsInit @ (List.rev extraBuyActions)
     let totalBuyValue =
         allBuyActions |> List.sumBy (function
-            | RebalanceAction.Buy(_, _, _, value, _) -> value
+            | Buy(_, _, _, value, _) -> value
             | _ -> 0m)
     let totalBuyCommission =
         allBuyActions |> List.sumBy (function
-            | RebalanceAction.Buy(_, _, _, _, commission) -> commission
+            | Buy(_, _, _, _, commission) -> commission
             | _ -> 0m)
 
     let totalSellCommission =
         sellActions |> List.sumBy (function
-            | RebalanceAction.Sell(_, _, _, _, commission) -> commission
+            | Sell(_, _, _, _, commission) -> commission
             | _ -> 0m)
 
     let aggregatedActions = aggregateActions (List.rev sellActions @ allBuyActions)

@@ -41,17 +41,17 @@ let main() = async {
             let getLatest = getLatestPricesInput.Equals("y")
      
             let! result = Scraper.ConstructIndexCache url indexCacheFile stockDataCacheFile currentPortfolioFile getLatest
-            printErrors(result)
+            printErrors result
             
         | "2" ->
             let! result = Table.ShowIndexAsync url indexCacheFile stockDataCacheFile currentPortfolioFile
-            printErrors(result)
+            printErrors result
         | "3" ->
             printf "\nEnter the amount of cash available for rebalancing: "
             let cashInput = Console.ReadLine()
 
             match Decimal.TryParse(cashInput.Replace(",", "")) with
-            | (true, cash) when cash > 0m ->
+            | true, cash when cash > 0m ->
                 do! Rebalancer.BalanceIndexAsync indexCacheFile stockDataCacheFile cash
             | _ ->
                 printfn "Invalid cash amount. Please enter a valid decimal number."  

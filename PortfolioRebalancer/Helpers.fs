@@ -13,7 +13,7 @@ let formatPKRShort (amount: decimal) =
     amount.ToString("N0", indianCulture)
 
 let toPercentage (value: decimal) =
-    value.ToString("P2")
+    value.ToString "P2"
 
 let (|ValidDecimal|_|) (str: string) =
     match Decimal.TryParse(str.Replace(",", "")) with
@@ -50,4 +50,4 @@ let calculateCommission sharePrice quantity =
     if sharePrice < 12m then
         0.03m * decimal quantity
     else
-        (sharePrice * decimal quantity) * 0.0025m
+        sharePrice * decimal quantity * 0.0025m

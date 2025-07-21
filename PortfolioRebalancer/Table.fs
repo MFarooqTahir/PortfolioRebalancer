@@ -68,18 +68,18 @@ let ShowPortfolioChanges rebalanceActions =
         rebalanceActions
         |> List.fold (fun (buys, sells, holds) action ->
             match action with
-            | RebalanceAction.Buy _ -> (action :: buys, sells, holds)
-            | RebalanceAction.Sell _ -> (buys, action :: sells, holds)
-            | RebalanceAction.Hold _ -> (buys, sells, action :: holds)
+            | Buy _ -> action :: buys, sells, holds
+            | Sell _ -> buys, action :: sells, holds
+            | Hold _ -> buys, sells, action :: holds
         ) ([], [], [])
 
     let addActionRow (table: Table) (action: RebalanceAction) =
         match action with
-        | RebalanceAction.Buy(symbol, unitPrice, shares, value, commission) ->
+        | Buy(symbol, unitPrice, shares, value, commission) ->
             table.AddRow(symbol, Helpers.formatPKR unitPrice, shares.ToString(), Helpers.formatPKR value, Helpers.formatPKR commission) |> ignore
-        | RebalanceAction.Sell(symbol, unitPrice, shares, value, commission) ->
+        | Sell(symbol, unitPrice, shares, value, commission) ->
             table.AddRow(symbol, Helpers.formatPKR unitPrice, shares.ToString(), Helpers.formatPKR value, Helpers.formatPKR commission) |> ignore
-        | RebalanceAction.Hold(symbol, unitPrice, shares, value) ->
+        | Hold(symbol, unitPrice, shares, value) ->
             table.AddRow(symbol, Helpers.formatPKR unitPrice, shares.ToString(), Helpers.formatPKR value, "-") |> ignore
 
     let renderTable (title: string) actions =
@@ -89,9 +89,9 @@ let ShowPortfolioChanges rebalanceActions =
                 .AddColumns("Symbol", "Unit Price", "Shares", "Value", "Commission")
         actions
         |> List.sortByDescending (function
-            | RebalanceAction.Buy(_, _, _, _, value) -> value
-            | RebalanceAction.Sell(_, _, _, _, value) -> value
-            | RebalanceAction.Hold(_, _, _, value) -> value)
+            | Buy(_, _, _, _, value) -> value
+            | Sell(_, _, _, _, value) -> value
+            | Hold(_, _, _, value) -> value)
         |> List.iter (addActionRow table)
         AnsiConsole.Write(table)
 
@@ -111,13 +111,13 @@ let ShowFinalPortfolio finalPortfolio finalCash =
         table.AddRow(
             symbol,
             shares.ToString(),
-            Helpers.formatPKR unitPrice,
-            Helpers.formatPKR value
+            formatPKR unitPrice,
+            formatPKR value
         ) |> ignore
     )
 
     AnsiConsole.Write(table)
-    AnsiConsole.MarkupLine $"[bold]Final Cash Left:[/] {Helpers.formatPKR finalCash}"
+    AnsiConsole.MarkupLine $"[bold]Final Cash Left:[/] {formatPKR finalCash}"
 
 let ShowRebalanceStats
     (initialCash: decimal)
@@ -127,9 +127,9 @@ let ShowRebalanceStats
     (totalSellCommission: decimal)
     (finalCash: decimal) =
 
-    AnsiConsole.MarkupLine $"[bold]Initial Cash:[/] {Helpers.formatPKR initialCash}"
-    AnsiConsole.MarkupLine $"[bold]Cash After Selling (Before Buying):[/] {Helpers.formatPKR cashAfterSells}"
-    AnsiConsole.MarkupLine $"[bold]Total Cash Spent on Buying:[/] {Helpers.formatPKR totalBuyValue}"
-    AnsiConsole.MarkupLine $"[bold]Total Commission on Buying:[/] {Helpers.formatPKR totalBuyCommission}"
-    AnsiConsole.MarkupLine $"[bold]Total Commission on Selling:[/] {Helpers.formatPKR totalSellCommission}"
-    AnsiConsole.MarkupLine $"[bold]Final Cash Left:[/] {Helpers.formatPKR finalCash}"
+    AnsiConsole.MarkupLine $"[bold]Initial Cash:[/] {formatPKR initialCash}"
+    AnsiConsole.MarkupLine $"[bold]Cash After Selling (Before Buying):[/] {formatPKR cashAfterSells}"
+    AnsiConsole.MarkupLine $"[bold]Total Cash Spent on Buying:[/] {formatPKR totalBuyValue}"
+    AnsiConsole.MarkupLine $"[bold]Total Commission on Buying:[/] {formatPKR totalBuyCommission}"
+    AnsiConsole.MarkupLine $"[bold]Total Commission on Selling:[/] {formatPKR totalSellCommission}"
+    AnsiConsole.MarkupLine $"[bold]Final Cash Left:[/] {formatPKR finalCash}"

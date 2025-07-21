@@ -13,17 +13,17 @@ open CachedFileData
 let private CreateChromeDriver() =
 
     let options = ChromeOptions()
-    options.AddArgument("--headless")
-    options.AddArgument("--no-sandbox")
-    options.AddArgument("--disable-dev-shm-usage")
-    options.AddArgument("--log-level=3")
-    options.AddArgument("--disable-logging")
-    options.AddArgument("--disable-gpu-sandbox")
-    options.AddArgument("--disable-software-rasterizer")
+    options.AddArgument "--headless"
+    options.AddArgument "--no-sandbox"
+    options.AddArgument "--disable-dev-shm-usage"
+    options.AddArgument "--log-level=3"
+    options.AddArgument "--disable-logging"
+    options.AddArgument "--disable-gpu-sandbox"
+    options.AddArgument "--disable-software-rasterizer"
     new ChromeDriver(options)
 
 let private WaitForElementAsync (driver: IWebDriver) (selector: By) (timeoutSeconds: float) = async {
-    let wait = WebDriverWait(driver, TimeSpan.FromSeconds(timeoutSeconds))
+    let wait = WebDriverWait(driver, TimeSpan.FromSeconds timeoutSeconds)
     try
         let element = wait.Until(fun d -> 
             let elements = d.FindElements(selector)
@@ -47,16 +47,16 @@ let private ExtractStockDataFromTable (rows: ReadOnlyCollection<IWebElement>) =
         let stockData = 
             rows
             |> Seq.choose (fun row ->
-                let cells = row.FindElements(By.TagName("td"))
+                let cells = row.FindElements(By.TagName "td")
                 
                 let symbol = 
                     if cells.Count > 0 then
                         try
-                            let dataOrder = cells.[0].GetAttribute("data-order")
+                            let dataOrder = cells.[0].GetAttribute "data-order"
                             if not (String.IsNullOrEmpty(dataOrder)) then 
                                 dataOrder.Trim()
                             else
-                                let strongElement = cells.[0].FindElement(By.CssSelector("a.tbl__symbol strong"))
+                                let strongElement = cells.[0].FindElement(By.CssSelector "a.tbl__symbol strong")
                                 strongElement.Text.Trim()
                         with
                         | _ -> 
@@ -89,7 +89,7 @@ let ScrapeIndexDataAsync (driver: IWebDriver) (url: string) (code: string) = asy
         driver.Navigate().GoToUrl(url)
         printfn "Navigated to: %s" url
 
-        let! kseLink = WaitForElementAsync driver (By.CssSelector($"a[data-code='{code}']")) 15.0
+        let! kseLink = WaitForElementAsync driver (By.CssSelector $"a[data-code='{code}']") 15.0
         
         match kseLink with
         | Error err -> return Error err
@@ -102,7 +102,7 @@ let ScrapeIndexDataAsync (driver: IWebDriver) (url: string) (code: string) = asy
                 printfn "Clicked %s link" code
                 do! Async.Sleep 3000
                 
-                let! selectElement = WaitForElementAsync driver (By.Name("DataTables_Table_1_length")) 15.0
+                let! selectElement = WaitForElementAsync driver (By.Name "DataTables_Table_1_length") 15.0
                 
                 match selectElement with
                 | Error err -> return Error err
@@ -113,7 +113,7 @@ let ScrapeIndexDataAsync (driver: IWebDriver) (url: string) (code: string) = asy
                     do! Async.Sleep 3000
 
                     
-                    let! tableElement = WaitForElementAsync driver (By.Id("DataTables_Table_1")) 15.0
+                    let! tableElement = WaitForElementAsync driver (By.Id "DataTables_Table_1") 15.0
                     
                     match tableElement with
                     | Error err -> return Error err
@@ -139,10 +139,10 @@ let GetStockFromPSXAsync (driver: IWebDriver) (symbol: string) = async {
         driver.Navigate().GoToUrl(url)
         printfn "Fetching price for %s from %s" symbol url
     
-        do! Task.Delay(2000) |> Async.AwaitTask
+        do! Task.Delay 2000 |> Async.AwaitTask
     
-        let! priceElement = WaitForElementAsync driver (By.CssSelector("div.quote__close")) 10.0
-        let! nameElementFull = WaitForElementAsync driver (By.CssSelector("div.quote__name")) 10.0
+        let! priceElement = WaitForElementAsync driver (By.CssSelector "div.quote__close") 10.0
+        let! nameElementFull = WaitForElementAsync driver (By.CssSelector "div.quote__name") 10.0
 
         match priceElement, nameElementFull with
         | Ok pElement, Ok nElementFull ->
