@@ -1,57 +1,58 @@
 ﻿module Types
-    type ScrapingError = 
-        | NavigationError of string
-        | ElementNotFound of string
-        | DataExtractionError of string
-        | PortfolioCreationError of string
-        | FileOperationError of string
 
-    type IndexTableRecord = {
-        Symbol: string
-        Weight: decimal
-    }
+type ScrapingError = 
+    | NavigationError of string
+    | ElementNotFound of string
+    | DataExtractionError of string
+    | PortfolioCreationError of string
+    | FileOperationError of string
 
-    type IndexTableWithPrice = {
-        Symbol: string
-        Name: string
-        Weight: decimal
-        Price: decimal
-    }
+type IndexTableRecord = {
+    Symbol: string
+    Weight: decimal
+}
 
-    type StockRecord = {
-        Symbol: string
-        Name: string
-        Price: decimal
-    }
+type IndexTableWithPrice = {
+    Symbol: string
+    Name: string
+    Weight: decimal
+    Price: decimal
+}
 
-    type CurrentPortfolioRecord = {
-        Symbol: string
-        Shares: int
-        AveragePrice: decimal
-    }
+type StockRecord = {
+    Symbol: string
+    Name: string
+    Price: decimal
+}
 
-    type IndexType = 
-        | KSE30
-        | KSE100
+type CurrentPortfolioRecord = {
+    Symbol: string
+    Shares: int
+    AveragePrice: decimal
+}
 
-    type TableStockRecord = {
-        Symbol: string
-        Name: string
-        Price: decimal
-        Weight: decimal
-    }
+type IndexType = 
+    | KSE30
+    | KSE100
 
-    type PortfolioPosition = {
-        Symbol: string
-        Name: string
-        TargetWeight: decimal
-        CurrentPrice: decimal
-        ActualShares: int
-        ActualValue: decimal
-        Commission: decimal
-        TotalCost: decimal
-    }
-    type RebalanceAction = 
-    | Buy of Symbol: string * UnitPrice: decimal * Shares: int * Value: decimal * Commission: decimal
-    | Sell of Symbol: string * UnitPrice: decimal * Shares: int * Value: decimal * Commission: decimal
-    | Hold of Symbol: string * UnitPrice: decimal * Shares: int * Value: decimal
+type TableStockRecord = {
+    Symbol: string
+    Name: string
+    Price: decimal
+    Weight: decimal
+}
+
+type PortfolioPosition = {
+    Symbol: string
+    Name: string
+    TargetWeight: decimal
+    CurrentPrice: decimal
+    ActualShares: int
+    ActualValue: decimal
+    Commission: decimal
+    TotalCost: decimal
+}
+type RebalanceAction = 
+| Buy of Symbol: string * UnitPrice: decimal * Shares: int * Value: decimal * Commission: decimal
+| Sell of Symbol: string * UnitPrice: decimal * Shares: int * Value: decimal * Commission: decimal
+| Hold of Symbol: string * UnitPrice: decimal * Shares: int * Value: decimal
