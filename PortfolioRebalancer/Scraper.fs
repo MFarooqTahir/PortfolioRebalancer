@@ -86,7 +86,7 @@ let private ExtractStockDataFromTable (rows: ReadOnlyCollection<IWebElement>) =
 let ScrapeIndexDataAsync (driver: IWebDriver) (url: string) (code: string) = async {
     
     try
-        driver.Navigate().GoToUrl(url)
+        driver.Navigate().GoToUrl url
         printfn "Navigated to: %s" url
 
         let! kseLink = WaitForElementAsync driver (By.CssSelector $"a[data-code='{code}']") 15.0

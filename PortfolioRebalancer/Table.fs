@@ -76,11 +76,11 @@ let ShowPortfolioChanges rebalanceActions =
     let addActionRow (table: Table) (action: RebalanceAction) =
         match action with
         | Buy(symbol, unitPrice, shares, value, commission) ->
-            table.AddRow(symbol, Helpers.formatPKR unitPrice, shares.ToString(), Helpers.formatPKR value, Helpers.formatPKR commission) |> ignore
+            table.AddRow(symbol, formatPKR unitPrice, shares.ToString(), formatPKR value, formatPKR commission) |> ignore
         | Sell(symbol, unitPrice, shares, value, commission) ->
-            table.AddRow(symbol, Helpers.formatPKR unitPrice, shares.ToString(), Helpers.formatPKR value, Helpers.formatPKR commission) |> ignore
+            table.AddRow(symbol, formatPKR unitPrice, shares.ToString(), formatPKR value, formatPKR commission) |> ignore
         | Hold(symbol, unitPrice, shares, value) ->
-            table.AddRow(symbol, Helpers.formatPKR unitPrice, shares.ToString(), Helpers.formatPKR value, "-") |> ignore
+            table.AddRow(symbol, formatPKR unitPrice, shares.ToString(), formatPKR value, "-") |> ignore
 
     let renderTable (title: string) actions =
         let table =
