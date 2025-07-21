@@ -51,3 +51,7 @@
         Commission: decimal
         TotalCost: decimal
     }
+    type RebalanceAction = 
+    | Buy of Symbol: string * UnitPrice: decimal * Shares: int * Value: decimal * Commission: decimal
+    | Sell of Symbol: string * UnitPrice: decimal * Shares: int * Value: decimal * Commission: decimal
+    | Hold of Symbol: string * UnitPrice: decimal * Shares: int * Value: decimal

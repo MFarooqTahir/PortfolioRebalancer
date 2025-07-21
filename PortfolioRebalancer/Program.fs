@@ -1,6 +1,7 @@
 ﻿open System
 open System.IO
 open Types
+open Helpers
 
 let printErrors (result: Result<unit, ScrapingError>) =
     match result with
@@ -28,6 +29,7 @@ let main() = async {
         printfn "1. Re Construct index cache"
         printfn "2. Show index"
         printfn "3. Balance index using cash"
+        printfn "4. Re-Balance current portfolio with cash"
         printfn "6. Exit"
         printf "Enter your choice (1-6): "
         let choice = Console.ReadLine()
@@ -47,11 +49,20 @@ let main() = async {
         | "3" ->
             printf "\nEnter the amount of cash available for rebalancing: "
             let cashInput = Console.ReadLine()
+
             match Decimal.TryParse(cashInput.Replace(",", "")) with
             | (true, cash) when cash > 0m ->
                 do! Rebalancer.BalanceIndexAsync indexCacheFile stockDataCacheFile cash
             | _ ->
-                printfn "Invalid cash amount. Please enter a valid decimal number."   
+                printfn "Invalid cash amount. Please enter a valid decimal number."  
+        | "4" ->
+            printf "\nEnter the amount of cash available for rebalancing: "
+            let cashInput = Console.ReadLine()
+            match cashInput with
+            | ValidDecimal cash ->
+                do! Rebalancer.RebalanceCurrentPortfolioAsync indexCacheFile stockDataCacheFile currentPortfolioFile cash
+            | _ ->
+                printfn "Invalid cash amount. Please enter a valid decimal number."
         | "6" ->
             printfn "Exiting program..."
             continueRunning <- false
