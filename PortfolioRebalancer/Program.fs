@@ -30,8 +30,8 @@ let main() = async {
         printfn "2. Show index"
         printfn "3. Balance index using cash"
         printfn "4. Re-Balance current portfolio with cash"
-        printfn "6. Exit"
-        printf "Enter your choice (1-6): "
+        printfn "5. Exit"
+        printf "Enter your choice (1-5): "
         let choice = Console.ReadLine()
             
         match choice with
@@ -63,7 +63,7 @@ let main() = async {
                 do! Rebalancer.RebalanceCurrentPortfolioAsync indexCacheFile stockDataCacheFile currentPortfolioFile cash
             | _ ->
                 printfn "Invalid cash amount. Please enter a valid decimal number."
-        | "6" ->
+        | "5" ->
             printfn "Exiting program..."
             continueRunning <- false
      
