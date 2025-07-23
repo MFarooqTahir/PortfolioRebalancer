@@ -27,7 +27,7 @@ let main() = async {
     while continueRunning do
         printfn "\nChoose an option:"
         printfn "1. Re Construct index cache"
-        printfn "2. Show index"
+        printfn "2. Show index and current porfolio"
         printfn "3. Balance index using cash"
         printfn "4. Re-Balance current portfolio with cash"
         printfn "5. Exit"
@@ -44,7 +44,7 @@ let main() = async {
             printErrors result
             
         | "2" ->
-            let! result = Table.ShowIndexAsync url indexCacheFile stockDataCacheFile currentPortfolioFile
+            let! result = Table.ShowIndexAndPortfolio url indexCacheFile stockDataCacheFile currentPortfolioFile
             printErrors result
         | "3" ->
             printf "\nEnter the amount of cash available for rebalancing: "

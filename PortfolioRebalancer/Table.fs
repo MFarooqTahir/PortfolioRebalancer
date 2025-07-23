@@ -7,7 +7,7 @@ open Helpers
 open CachedFileData
 open Scraper
 
-let ShowIndexAsync url indexCacheFile stockDataCacheFile currentPortfolioFile = async {
+let ShowIndexAndPortfolio url indexCacheFile stockDataCacheFile currentPortfolioFile = async {
     if not (File.Exists(indexCacheFile)) then
         let! constructResult = ConstructIndexCache url indexCacheFile stockDataCacheFile currentPortfolioFile true
         match constructResult with
@@ -15,8 +15,9 @@ let ShowIndexAsync url indexCacheFile stockDataCacheFile currentPortfolioFile = 
                 printf "Error constructing cache: %A" err
                 return ()
             | Ok () -> ()
-        
-    let table = 
+            
+    // Show Index Table
+    let indexTable = 
         Table()
             .Title("=== Index ===")
             .AddColumns("Symbol", "Name", "Price", "Weight")
@@ -26,14 +27,62 @@ let ShowIndexAsync url indexCacheFile stockDataCacheFile currentPortfolioFile = 
 
     ToStockTableRecord indexRecords individualStocks
         |> List.sortByDescending _.Weight
-        |> List.iter (fun r -> table.AddRow(r.Symbol, r.Name, string r.Price, toPercentage r.Weight) |> ignore)
+        |> List.iter (fun r -> indexTable.AddRow(r.Symbol, r.Name, formatPKR r.Price, toPercentage r.Weight) |> ignore)
 
-    AnsiConsole.Write(table)
-    
+    AnsiConsole.Write(indexTable)
+
+    let portfolioTable =
+        Table()
+            .Title("=== Current Portfolio ===")
+            .AddColumns("Symbol", "Name", "Shares", "Avg Price", "Market Price", "Market Value", "Invested Value", "Gain/Loss", "Gain/Loss %")
+
+    let! currentPortfolio = GetCurrentPortfolioRecordsData currentPortfolioFile
+
+    let stockMap = individualStocks |> List.map (fun s -> s.Symbol, s) |> Map.ofList
+
+    currentPortfolio
+    |> List.sortByDescending (fun p ->
+        match stockMap |> Map.tryFind p.Symbol with
+        | Some stock -> decimal p.Shares * stock.Price
+        | None -> 0m
+    )
+    |> List.iter (fun p ->
+        match stockMap |> Map.tryFind p.Symbol with
+        | Some stock ->
+            let marketValue = decimal p.Shares * stock.Price
+            let investedValue = decimal p.Shares * p.AveragePrice
+            let gainLoss = marketValue - investedValue
+            let gainLossPct = if investedValue <> 0m then (gainLoss / investedValue) * 100m else 0m
+            portfolioTable.AddRow(
+                p.Symbol,
+                stock.Name,
+                p.Shares.ToString(),
+                formatPKR p.AveragePrice,
+                formatPKR stock.Price,
+                formatPKR marketValue,
+                formatPKR investedValue,
+                formatPKR gainLoss,
+                (sprintf "%.2f%%" gainLossPct)
+            ) |> ignore
+        | None ->
+            portfolioTable.AddRow(
+                p.Symbol,
+                "-",
+                string p.Shares,
+                formatPKR p.AveragePrice,
+                "-",
+                "-",
+                "-",
+                "-",
+                "-"
+            ) |> ignore
+    )
+
+    AnsiConsole.Write(portfolioTable)
+
     return Ok ()
 }
-
-let ShowRebalanceResultAsync portfolioPosition finalCash =
+let ShowRebalanceResult portfolioPosition finalCash =
     let table =
             Table()
                 .Title("=== Rebalanced Portfolio ===")

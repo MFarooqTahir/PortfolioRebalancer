@@ -106,7 +106,7 @@ let BalanceIndexAsync indexCacheFile stockDataCacheFile cash = async {
 
     let finalPositions, finalCash = invest initialPositions cash 0
 
-    ShowRebalanceResultAsync finalPositions finalCash |> ignore
+    ShowRebalanceResult finalPositions finalCash |> ignore
     return ()
 }
 
