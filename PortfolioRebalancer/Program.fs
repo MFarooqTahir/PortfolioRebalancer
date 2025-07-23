@@ -2,6 +2,7 @@
 open System.IO
 open Types
 open Helpers
+open Rebalancer
 
 let printErrors (result: Result<unit, ScrapingError>) =
     match result with
@@ -14,7 +15,7 @@ let printErrors (result: Result<unit, ScrapingError>) =
             | PortfolioCreationError msg -> printfn "Portfolio Creation Error: %s" msg
             | FileOperationError msg -> printfn "File Operation Error: %s" msg
         | _ -> ()
-
+ 
 let main() = async {
     let url = "https://dps.psx.com.pk/indices"
     let savePath = @"C:\Users\Administrator\Documents\Portfolio Data"
@@ -49,10 +50,14 @@ let main() = async {
         | "3" ->
             printf "\nEnter the amount of cash available for rebalancing: "
             let cashInput = Console.ReadLine()
-
+ 
             match Decimal.TryParse(cashInput.Replace(",", "")) with
             | true, cash when cash > 0m ->
-                do! Rebalancer.BalanceIndexAsync indexCacheFile stockDataCacheFile cash
+                printf "\nReinvest remaining cash? (This may reduce balance accuracy but minimizes unused cash) (y/n): "
+                let reinvestInput = Console.ReadLine()
+                let reinvestRemainingCash = reinvestInput.Equals("y", StringComparison.OrdinalIgnoreCase)
+                
+                do! BalanceIndexAsync indexCacheFile stockDataCacheFile cash reinvestRemainingCash
             | _ ->
                 printfn "Invalid cash amount. Please enter a valid decimal number."  
         | "4" ->
@@ -60,7 +65,11 @@ let main() = async {
             let cashInput = Console.ReadLine()
             match cashInput with
             | ValidDecimal cash ->
-                do! Rebalancer.RebalanceCurrentPortfolioAsync indexCacheFile stockDataCacheFile currentPortfolioFile cash
+                printf "\nReinvest remaining cash? (This may reduce balance accuracy but minimizes unused cash) (y/n): "
+                let reinvestInput = Console.ReadLine()
+                let reinvestRemainingCash = reinvestInput.Equals("y", StringComparison.OrdinalIgnoreCase)
+                
+                do! RebalanceCurrentPortfolioAsync indexCacheFile stockDataCacheFile currentPortfolioFile cash reinvestRemainingCash
             | _ ->
                 printfn "Invalid cash amount. Please enter a valid decimal number."
         | "5" ->
