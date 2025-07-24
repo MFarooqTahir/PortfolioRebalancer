@@ -67,7 +67,10 @@ let main() = async {
                 printf "\nReinvest remaining cash? (This may reduce balance accuracy but minimizes unused cash) (y/n): "
                 let reinvestInput = Console.ReadLine()
                 let reinvestRemainingCash = reinvestInput.Equals("y", StringComparison.OrdinalIgnoreCase)
-                do! RebalanceCurrentPortfolioAsync cash reinvestRemainingCash
+                printf "\nShow estimated taxes? (y/n): "
+                let showTaxInput = Console.ReadLine()
+                let showTaxes = showTaxInput.Equals("y", StringComparison.OrdinalIgnoreCase)
+                do! RebalanceCurrentPortfolioAsync cash reinvestRemainingCash showTaxes
             | _ ->
                 printfn "Invalid cash amount. Please enter a valid decimal number."
         | "5" ->

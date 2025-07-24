@@ -126,7 +126,7 @@ let BalanceIndexAsync (cash: decimal) (reinvestRemainingCash: bool) = async {
     return ()
 }
 
-let RebalanceCurrentPortfolioAsync (cash: decimal) (reinvestRemainingCash: bool) = async {
+let RebalanceCurrentPortfolioAsync (cash: decimal) (reinvestRemainingCash: bool) (showTaxes: bool) = async {
     let! indexRecords = getIndexRecordsAsync()
     let! individualStockData = getStockRecordsAsync()
     let! transactionsDb = getPortfolioTransactionsAsync()
@@ -174,7 +174,9 @@ let RebalanceCurrentPortfolioAsync (cash: decimal) (reinvestRemainingCash: bool)
             let sharesToSell = currentShares - targetShares
             let value = decimal sharesToSell * price
             let commission = calculateCommission price sharesToSell
-            let cgt = value * getCGTRate (System.DateTime.UtcNow.AddYears(-2)) System.DateTime.UtcNow
+            let txnsDb = transactionsDb |> List.filter (fun t -> t.Symbol = symbol)
+            let txns = txnsDb |> List.map Db.toDomain
+            let cgt = Table.getTotalCGTFromTxns txns
             let net = value - commission - cgt
             cashAvailable <- cashAvailable + net
             sharesMap <- sharesMap.Add(symbol, currentShares - sharesToSell)
@@ -209,8 +211,10 @@ let RebalanceCurrentPortfolioAsync (cash: decimal) (reinvestRemainingCash: bool)
         |> List.choose (fun symbol ->
             let shares = sharesMap |> Map.tryFind symbol |> Option.defaultValue 0
             let price = getPrice symbol
-            if shares > 0 && price > 0m then Some (symbol, getName symbol, shares, price, decimal shares * price) else None)
-        |> List.sortByDescending (fun (_,_,_,_,value) -> value)
+            let targetWeight = weightMap |> Map.tryFind symbol
+            let value = decimal shares * price
+            if shares > 0 && price > 0m then Some (symbol, getName symbol, shares, price, value, targetWeight) else None)
+        |> List.sortByDescending (fun (_,_,_,_,value,_) -> value)
     let sellActionsSorted = sellActions |> List.sortByDescending (fun (_,_,value,_,_) -> value)
     let buyActionsSorted = buyActions |> List.sortByDescending (fun (_,_,value,_) -> value)
     let totalSellCommission = sellActions |> List.sumBy (fun (_,_,_,commission,_) -> commission)
@@ -218,9 +222,14 @@ let RebalanceCurrentPortfolioAsync (cash: decimal) (reinvestRemainingCash: bool)
     let proceedsFromSells = sellActions |> List.sumBy (fun (_,_,value,commission,tax) -> value - commission - tax)
     let totalBuyCommission = buyActions |> List.sumBy (fun (_,_,_,commission) -> commission)
     let costOfBuys = buyActions |> List.sumBy (fun (_,_,value,commission) -> value + commission)
-    Table.ShowRebalanceActionsWithTax "=== Sells Required ===" sellActionsSorted true totalSellCommission totalSellTax proceedsFromSells (cash + proceedsFromSells)
-    let buyActionsWithTax = buyActionsSorted |> List.map (fun (a,b,c,d) -> (a,b,c,d,0m))
-    Table.ShowRebalanceActionsWithTax "=== Buys Required ===" buyActionsWithTax false totalBuyCommission 0m costOfBuys cashAvailable
+    if showTaxes then
+        printfn "[NOTE] All tax values shown below are estimates based on current transaction history and FIFO lot logic."
+        Table.ShowRebalanceActionsWithTax "=== Sells Required ===" sellActionsSorted true totalSellCommission totalSellTax proceedsFromSells (cash + proceedsFromSells)
+        let buyActionsWithTax = buyActionsSorted |> List.map (fun (a,b,c,d) -> (a,b,c,d,0m))
+        Table.ShowRebalanceActionsWithTax "=== Buys Required ===" buyActionsWithTax false totalBuyCommission 0m costOfBuys cashAvailable
+    else
+        Table.ShowRebalanceActionsNoTax "=== Sells Required ===" (sellActionsSorted |> List.map (fun (a,b,c,d,_) -> (a,b,c,d))) true totalSellCommission proceedsFromSells (cash + proceedsFromSells)
+        Table.ShowRebalanceActionsNoTax "=== Buys Required ===" buyActionsSorted false totalBuyCommission costOfBuys cashAvailable
     Table.ShowFinalPortfolioWithNamesAndCash finalPortfolio cashAvailable
     return ()
 }

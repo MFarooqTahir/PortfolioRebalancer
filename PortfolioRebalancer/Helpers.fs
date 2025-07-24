@@ -5,12 +5,14 @@ open System
 open Types
 
 let indianCulture = CultureInfo "hi-IN"
+do
+    indianCulture.NumberFormat.CurrencySymbol <- "Rs."
 
 let formatPKR (amount: decimal) = 
-    amount.ToString("N2", indianCulture)
+    amount.ToString("C2", indianCulture)
 
 let formatPKRShort (amount: decimal) = 
-    amount.ToString("N0", indianCulture)
+    amount.ToString("C0", indianCulture)
 
 let toPercentage (value: decimal) =
     value.ToString "P2"

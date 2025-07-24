@@ -189,6 +189,33 @@ let ShowRebalanceActions (title: string) (actions: (PortfolioPosition * int * de
         ) |> ignore)
     AnsiConsole.Write(table)
 
+let ShowRebalanceActionsNoTax (title: string) (actions: (PortfolioPosition * int * decimal * decimal) list) (isSell: bool) (totalCommission: decimal) (totalValue: decimal) (cashAfter: decimal) =
+    let table =
+        Table()
+            .Title(title)
+            .AddColumns([|"Action"; "Symbol"; "Name"; "Shares"; "Price"; "Value"; "Commission"; "Total"|])
+    actions
+    |> List.iter (fun (pos, shares, value, commission) ->
+        let action = if isSell then "Sell" else "Buy"
+        table.AddRow(
+            action,
+            pos.Symbol,
+            pos.Name,
+            shares.ToString(),
+            formatPKR pos.CurrentPrice,
+            formatPKR value,
+            formatPKR commission,
+            formatPKR (if isSell then value - commission else value + commission)
+        ) |> ignore)
+    AnsiConsole.Write(table)
+    AnsiConsole.MarkupLine $"[bold]Total Commission:[/] {formatPKR totalCommission}"
+    if isSell then
+        AnsiConsole.MarkupLine $"[bold]Total Proceeds After Commission:[/] {formatPKR totalValue}"
+        AnsiConsole.MarkupLine $"[bold]Cash After Sells:[/] {formatPKR cashAfter}"
+    else
+        AnsiConsole.MarkupLine $"[bold]Total Cost of Buys (incl. commission):[/] {formatPKR totalValue}"
+        AnsiConsole.MarkupLine $"[bold]Cash After Buys:[/] {formatPKR cashAfter}"
+
 let ShowFinalPortfolioWithNames (finalPortfolio: (string * int * decimal * decimal * string) list) =
     let table =
         Table()
@@ -235,19 +262,24 @@ let ShowRebalanceActionsWithTax (title: string) (actions: (PortfolioPosition * i
         AnsiConsole.MarkupLine $"[bold]Total Cost of Buys (incl. commission):[/] {formatPKR totalValue}"
         AnsiConsole.MarkupLine $"[bold]Cash After Buys:[/] {formatPKR cashAfter}"
 
-let ShowFinalPortfolioWithNamesAndCash (finalPortfolio: (string * string * int * decimal * decimal) list) (cashLeft: decimal) =
+let ShowFinalPortfolioWithNamesAndCash (finalPortfolio: (string * string * int * decimal * decimal * decimal option) list) (cashLeft: decimal) =
+    let totalValue = finalPortfolio |> List.sumBy (fun (_, _, _, _, value, _) -> value)
     let table =
         Table()
             .Title("=== Final Portfolio After Rebalancing ===")
-            .AddColumns([|"Symbol"; "Name"; "Shares"; "Unit Price"; "Value"|])
+            .AddColumns([|"Symbol"; "Name"; "Shares"; "Unit Price"; "Value"; "Current Weight %"; "Target Weight %"|])
     finalPortfolio
-    |> List.iter (fun (symbol, name, shares, price, value) ->
+    |> List.iter (fun (symbol, name, shares, price, value, targetWeightOpt) ->
+        let currentWeight = if totalValue > 0m then (value / totalValue) * 100m else 0m
+        let targetWeight = targetWeightOpt |> Option.defaultValue 0m
         table.AddRow(
             symbol,
             name,
             shares.ToString(),
             formatPKR price,
-            formatPKR value
+            formatPKR value,
+            sprintf "%.2f%%" currentWeight,
+            sprintf "%.2f%%" (targetWeight * 100m)
         ) |> ignore)
     AnsiConsole.Write(table)
     AnsiConsole.MarkupLine $"[bold]Final Cash Left:[/] {formatPKR cashLeft}"
