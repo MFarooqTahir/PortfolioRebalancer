@@ -31,7 +31,7 @@ let private calculateCDCCharges (transactionValue: decimal) =
     let percentCharge = transactionValue * 0.000036M
     max 5.0M percentCharge
 
-let BalanceIndexAsync (cash: decimal) (reinvestRemainingCash: bool) = async {
+let BalanceIndexAsync (cash: decimal) (reinvestRemainingCash: bool) (calcCommission: bool) = async {
     let! indexRecords = getIndexRecordsAsync()
     let! individualStockData = getStockRecordsAsync()
     let stockData = ToStockTableRecord indexRecords individualStockData
@@ -73,19 +73,19 @@ let BalanceIndexAsync (cash: decimal) (reinvestRemainingCash: bool) = async {
                             let sharesToBuy = min maxSharesFromAllocation maxSharesFromGap
                             if sharesToBuy > 0 then
                                 let shareValue = decimal sharesToBuy * p.CurrentPrice
-                                let commission = calculateCommission p.CurrentPrice sharesToBuy
+                                let commission = if calcCommission then calculateCommission p.CurrentPrice sharesToBuy else 0m
                                 let totalCost = shareValue + commission
-                                if totalCost <= remainingCash then Some (p, sharesToBuy, totalCost) else None
+                                if totalCost <= remainingCash then Some (p, sharesToBuy, totalCost, commission) else None
                             else None
                         else None)
                 if List.isEmpty purchaseCandidates then (positions, remainingCash)
                 else
                     let updatedPositions, totalSpent =
                         purchaseCandidates
-                        |> List.fold (fun (accPos: PortfolioPosition list, accSpent) (p, sharesToBuy, totalCost) ->
+                        |> List.fold (fun (accPos: PortfolioPosition list, accSpent) (p, sharesToBuy, totalCost, commission) ->
                             let newShares = p.ActualShares + sharesToBuy
                             let newActualValue = decimal newShares * p.CurrentPrice
-                            let newCommission = calculateCommission p.CurrentPrice newShares
+                            let newCommission = if calcCommission then calculateCommission p.CurrentPrice newShares else 0m
                             let newTotalCost = newActualValue + newCommission
                             let updatedPosition: PortfolioPosition = { p with ActualShares = newShares; ActualValue = newActualValue; Commission = newCommission; TotalCost = newTotalCost }
                             let updatedList = accPos |> List.map (fun pos -> if pos.Symbol = p.Symbol then updatedPosition else pos)
@@ -101,17 +101,17 @@ let BalanceIndexAsync (cash: decimal) (reinvestRemainingCash: bool) = async {
                 let targetValue = targetValues.[p.Symbol]
                 let relativeGap = if targetValue > 0m then (targetValue - p.ActualValue) / targetValue else 0m
                 if p.CurrentPrice > 0m && relativeGap > 0.01m then
-                    let commission = calculateCommission p.CurrentPrice 1
+                    let commission = if calcCommission then calculateCommission p.CurrentPrice 1 else 0m
                     let totalCost = p.CurrentPrice + commission
-                    if totalCost <= remainingCash then Some (p, totalCost) else None
+                    if totalCost <= remainingCash then Some (p, totalCost, commission) else None
                 else None)
-            |> List.sortByDescending (fun (p, _) -> p.TargetWeight)
+            |> List.sortByDescending (fun (p, _, _) -> p.TargetWeight)
         match candidates with
         | [] -> positions, remainingCash
-        | (bestPosition, totalCost) :: _ ->
+        | (bestPosition, totalCost, commission) :: _ ->
             let newShares = bestPosition.ActualShares + 1
             let newActualValue = decimal newShares * bestPosition.CurrentPrice
-            let newCommission = calculateCommission bestPosition.CurrentPrice newShares
+            let newCommission = if calcCommission then calculateCommission bestPosition.CurrentPrice newShares else 0m
             let newTotalCost = newActualValue + newCommission
             let updatedPosition: PortfolioPosition = { bestPosition with ActualShares = newShares; ActualValue = newActualValue; Commission = newCommission; TotalCost = newTotalCost }
             let updatedPositions = positions |> List.map (fun pos -> if pos.Symbol = bestPosition.Symbol then updatedPosition else pos)
@@ -122,7 +122,7 @@ let BalanceIndexAsync (cash: decimal) (reinvestRemainingCash: bool) = async {
             if cash < cashAfterBalancing then printfn "Note: Remaining cash was reinvested. This may reduce balance accuracy to minimize unused cash."
             positions, cash
         else positionsAfterBalancing, cashAfterBalancing
-    ShowRebalanceResult finalPositions finalCash |> ignore
+    Table.ShowRebalanceResultWithWeights finalPositions finalCash calcCommission |> ignore
     return ()
 }
 

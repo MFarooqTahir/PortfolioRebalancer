@@ -339,3 +339,49 @@ let showCurrentPortfolio () = async {
     AnsiConsole.MarkupLine $"[grey]Current market value is not shown in this view. Use the main index/portfolio view for more info.[/]"
     return ()
 }
+
+let ShowRebalanceResultWithWeights (portfolioPosition: PortfolioPosition list) (finalCash: decimal) (calcCommission: bool) =
+    let totalValue = portfolioPosition |> List.sumBy (fun p -> p.ActualValue)
+    let table =
+        Table()
+            .Title("=== Rebalanced Portfolio ===")
+    if calcCommission then
+        table.AddColumns([|"Symbol"; "Name"; "Weight"; "Price"; "Shares"; "Value"; "Commission"; "Total Cost"; "Current Weight %"; "Target Weight %"|]) |> ignore
+    else
+        table.AddColumns([|"Symbol"; "Name"; "Weight"; "Price"; "Shares"; "Value"; "Current Weight %"; "Target Weight %"|]) |> ignore
+    portfolioPosition
+        |> List.sortByDescending (fun p -> p.TargetWeight)
+        |> List.iter (fun p ->
+            let currentWeight = if totalValue > 0m then (p.ActualValue / totalValue) * 100m else 0m
+            let targetWeight = p.TargetWeight * 100m
+            if calcCommission then
+                table.AddRow(
+                    p.Symbol,
+                    p.Name,
+                    toPercentage p.TargetWeight,
+                    formatPKR p.CurrentPrice,
+                    p.ActualShares.ToString(),
+                    formatPKR p.ActualValue,
+                    formatPKR p.Commission,
+                    formatPKR p.TotalCost,
+                    sprintf "%.2f%%" currentWeight,
+                    sprintf "%.2f%%" targetWeight
+                ) |> ignore
+            else
+                table.AddRow(
+                    p.Symbol,
+                    p.Name,
+                    toPercentage p.TargetWeight,
+                    formatPKR p.CurrentPrice,
+                    p.ActualShares.ToString(),
+                    formatPKR p.ActualValue,
+                    sprintf "%.2f%%" currentWeight,
+                    sprintf "%.2f%%" targetWeight
+                ) |> ignore)
+    AnsiConsole.Write(table)
+    let totalUsed = portfolioPosition |> List.sumBy (fun p -> p.TotalCost)
+    let totalCommission = portfolioPosition |> List.sumBy (fun p -> p.Commission)
+    AnsiConsole.MarkupLine $"[bold]Total Cash Used:[/] {formatPKR totalUsed}"
+    if calcCommission then
+        AnsiConsole.MarkupLine $"[bold]Total Commission:[/] {formatPKR totalCommission}"
+    AnsiConsole.MarkupLine $"[bold]Total Cash Left:[/] {formatPKR finalCash}"

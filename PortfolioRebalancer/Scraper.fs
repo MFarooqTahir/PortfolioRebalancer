@@ -136,7 +136,7 @@ let ScrapeIndexDataAsync (driver: IWebDriver) (url: string) (code: string) = asy
 let GetStockFromPSXAsync (driver: IWebDriver) (symbol: string) = async {
     try
         let url = sprintf "https://dps.psx.com.pk/company/%s" symbol
-        driver.Navigate().GoToUrl(url)
+        driver.Navigate().GoToUrl url
         printfn "Fetching price for %s from %s" symbol url
     
         do! Task.Delay 2000 |> Async.AwaitTask
@@ -153,9 +153,9 @@ let GetStockFromPSXAsync (driver: IWebDriver) (symbol: string) = async {
                 let priceText = pElement.Text.Replace("Rs.", "").Replace(",", "").Trim()
                 let name = nameObj :?> string
 
-                match Decimal.TryParse(priceText), name with
-                | (true, price), nameText when not (String.IsNullOrEmpty(nameText)) -> 
-                    printfn "Found price for %s: Rs.%s" symbol (formatPKR price)
+                match priceText, name with
+                | ValidDecimal price, nameText when not (String.IsNullOrEmpty(nameText)) -> 
+                    printfn "Found price for %s: %s" symbol (formatPKR price)
                     return Ok (price, nameText)
                 | _, _ -> 
                     printfn "Could not parse price for %s: %s or name error %s" symbol priceText name
@@ -196,17 +196,14 @@ let private GetMissingStockPricesAsync (driver: IWebDriver) (missingSymbols: str
 
 let updateStockRecordsForSymbols (symbols: string list) = async {
     use driver = CreateChromeDriver()
-    let! stockUpdates =
-        symbols
-        |> List.map (fun symbol -> async {
-            let! result = GetStockFromPSXAsync driver symbol
-            match result with
-            | Ok (price, name) ->
-                return Some { Symbol = symbol; Name = name; Price = price }
-            | Error _ -> return None
-        })
-        |> Async.Parallel
-    let stockRecords = stockUpdates |> Array.choose id |> Array.toList
+    let mutable stockRecords = []
+    for symbol in symbols do
+        let! result = GetStockFromPSXAsync driver symbol
+        match result with
+        | Ok (price, name) ->
+            stockRecords <- { Symbol = symbol; Name = name; Price = price } :: stockRecords
+        | Error _ ->
+            ()
     if not (List.isEmpty stockRecords) then
         let! existingStocks = Db.getStockRecordsAsync ()
         let merged =

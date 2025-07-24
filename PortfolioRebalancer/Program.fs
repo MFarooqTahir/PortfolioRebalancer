@@ -6,6 +6,7 @@ open Scraper
 open Table
 open Db
 open Spectre.Console
+open PortfolioImporter
 
 let printErrors (result: Result<unit, ScrapingError>) =
     match result with
@@ -51,12 +52,15 @@ let main() = async {
         | "3" ->
             printf "\nEnter the amount of cash available for rebalancing: "
             let cashInput = Console.ReadLine()
-            match Decimal.TryParse(cashInput.Replace(",", "")) with
-            | true, cash when cash > 0m ->
+            match cashInput.Replace(",", "") with
+            | ValidDecimal cash when cash > 0m ->
                 printf "\nReinvest remaining cash? (This may reduce balance accuracy but minimizes unused cash) (y/n): "
                 let reinvestInput = Console.ReadLine()
                 let reinvestRemainingCash = reinvestInput.Equals("y", StringComparison.OrdinalIgnoreCase)
-                do! BalanceIndexAsync cash reinvestRemainingCash
+                printf "\nCalculate commission on buy orders? (y/n): "
+                let commissionInput = Console.ReadLine()
+                let calcCommission = commissionInput.Equals("y", StringComparison.OrdinalIgnoreCase)
+                do! BalanceIndexAsync cash reinvestRemainingCash calcCommission
             | _ ->
                 printfn "Invalid cash amount. Please enter a valid decimal number."  
         | "4" ->
@@ -74,7 +78,7 @@ let main() = async {
             | _ ->
                 printfn "Invalid cash amount. Please enter a valid decimal number."
         | "5" ->
-            do! importPortfolioFromFile portfolioImport
+            do! PortfolioImporter.importPortfolioFromFile portfolioImport
             printfn "Portfolio imported and upserted from %s" portfolioImport
         | "6" ->
             do! showTransactionHistory ()
