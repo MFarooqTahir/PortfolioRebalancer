@@ -4,7 +4,7 @@ open System.Globalization
 open System
 open Types
 
-let indianCulture = CultureInfo("hi-IN")
+let indianCulture = CultureInfo "hi-IN"
 
 let formatPKR (amount: decimal) = 
     amount.ToString("N2", indianCulture)

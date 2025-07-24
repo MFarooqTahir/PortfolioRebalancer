@@ -1,0 +1,9 @@
+---
+alwaysApply: true
+---
+- Please always use the F# best practices and make sure you dont add anything necessary.
+- Make sure the code is always optimized and not doing unnecessary stuff.
+- Make sure to look at the project file to see the f sharp version and use the latest features.
+- Do not make mistakes or linting errors, make sure code is readable and has no linting errors. 
+- Never use comments.
+- Never remove functionality or logic unless specifically asked to

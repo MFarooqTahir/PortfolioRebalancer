@@ -8,9 +8,9 @@ open OpenQA.Selenium.Chrome
 open OpenQA.Selenium.Support.UI
 open Types
 open Helpers
-open CachedFileData
+open Db
 
-let private CreateChromeDriver() =
+let CreateChromeDriver() =
 
     let options = ChromeOptions()
     options.AddArgument "--headless"
@@ -69,7 +69,7 @@ let private ExtractStockDataFromTable (rows: ReadOnlyCollection<IWebElement>) =
                 let weightText= if cells.Count > 6 then cells.[6].Text.Trim() else ""
 
                 match weightText, priceText with
-                    | ValidWeight weight, ValidDecimal price -> 
+                    | ValidWeight weight, ValidDecimal price ->
                         Some {
                             Symbol = symbol
                             Weight = weight
@@ -87,7 +87,7 @@ let ScrapeIndexDataAsync (driver: IWebDriver) (url: string) (code: string) = asy
     
     try
         driver.Navigate().GoToUrl url
-        printfn "Navigated to: %s" url
+        printfn "Navigated to: %s\n" url
 
         let! kseLink = WaitForElementAsync driver (By.CssSelector $"a[data-code='{code}']") 15.0
         
@@ -194,50 +194,63 @@ let private GetMissingStockPricesAsync (driver: IWebDriver) (missingSymbols: str
     return results
 }
 
-let ConstructIndexCache url indexCacheFile stockCacheFile currentPortfolioFile getLatestStockPrices = async {
-    let indexType = KSE30
+let updateStockRecordsForSymbols (symbols: string list) = async {
+    use driver = CreateChromeDriver()
+    let! stockUpdates =
+        symbols
+        |> List.map (fun symbol -> async {
+            let! result = GetStockFromPSXAsync driver symbol
+            match result with
+            | Ok (price, name) ->
+                return Some { Symbol = symbol; Name = name; Price = price }
+            | Error _ -> return None
+        })
+        |> Async.Parallel
+    let stockRecords = stockUpdates |> Array.choose id |> Array.toList
+    if not (List.isEmpty stockRecords) then
+        let! existingStocks = Db.getStockRecordsAsync ()
+        let merged =
+            stockRecords @ existingStocks
+            |> List.groupBy (fun s -> s.Symbol)
+            |> List.map (fun (_, group) -> List.head group)
+        do! Db.setStockRecordsAsync merged
+    return ()
+}
 
+let ConstructIndexCache url getLatestStockPrices = async {
+    let indexType = KSE30
     let code = 
         match indexType with
             | KSE30 -> "KSE30"
             | KSE100 -> "KSE100"
     printf "Getting and constructing cache for %s" code
-
     use driver = CreateChromeDriver()
-
     let! indexData = ScrapeIndexDataAsync driver url code
     match indexData with
         | Error err -> return Error err
         | Ok kseData ->
-
             if getLatestStockPrices then
-                let! currentPortfolio = GetCurrentPortfolioRecordsData currentPortfolioFile
-
+                let! currentTransactions = getPortfolioTransactionsAsync()
+                let! currentStocks = getStockRecordsAsync()
                 let stocksWithData = 
                     kseData 
                         |> List.filter (fun x -> x.Price <> 0m)
                         |> List.map _.Symbol
                         |> Set.ofList
-                            
-
                 let portfolioSymbols = 
-                    currentPortfolio
-                        |> List.filter (fun x -> not (stocksWithData.Contains(x.Symbol)))   
-                        |> List.map _.Symbol
+                    currentTransactions
+                        |> List.map (fun x -> x.Symbol)
+                        |> List.filter (fun x -> not (stocksWithData.Contains(x)))   
                         |> List.distinct
-
                 let stocksWithoutData = 
                     kseData 
                         |> List.filter (fun x -> x.Price = 0m)
                         |> List.map _.Symbol
                         |> List.distinct
-
-
                 let! kseSymbols = 
                     (portfolioSymbols @ stocksWithoutData)
                         |> List.distinct
                         |> GetMissingStockPricesAsync driver
-                    
                 let allData =
                     kseData 
                         |> List.filter (fun x -> x.Price <> 0m)
@@ -249,15 +262,10 @@ let ConstructIndexCache url indexCacheFile stockCacheFile currentPortfolioFile g
                             })
                         |> List.append kseSymbols
                         |> List.distinctBy _.Symbol
-
-                let! oldData = GetIndividualStockData stockCacheFile
-
                 let mergedData = 
-                    allData @ oldData
+                    allData @ currentStocks
                         |> List.distinctBy _.Symbol
-
-                do! SetIndividualStockData stockCacheFile mergedData
-
+                do! setStockRecordsAsync mergedData
             let indexData = 
                 kseData 
                     |> List.map (fun x -> 
@@ -265,9 +273,7 @@ let ConstructIndexCache url indexCacheFile stockCacheFile currentPortfolioFile g
                                 Symbol = x.Symbol
                                 Weight = x.Weight
                         });
-
-            do! SetIndexRecords indexCacheFile indexData
-
+            do! setIndexRecordsAsync indexData
             printfn "Cache constructed"
             return Ok ()
 }

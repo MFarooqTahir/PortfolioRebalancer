@@ -1,4 +1,6 @@
 ﻿module Types
+open System
+open System.Text.Json.Serialization
 
 type ScrapingError = 
     | NavigationError of string
@@ -7,28 +9,49 @@ type ScrapingError =
     | PortfolioCreationError of string
     | FileOperationError of string
 
+[<CLIMutable>]
 type IndexTableRecord = {
     Symbol: string
-    Weight: decimal
+    Weight: decimal // Always 4 decimal places
 }
 
+[<CLIMutable>]
 type IndexTableWithPrice = {
     Symbol: string
     Name: string
-    Weight: decimal
-    Price: decimal
+    Weight: decimal // Always 4 decimal places
+    Price: decimal // Always 4 decimal places
 }
 
+[<CLIMutable>]
 type StockRecord = {
     Symbol: string
     Name: string
-    Price: decimal
+    Price: decimal // Always 4 decimal places
+}
+
+type TransactionType = Buy | Sell
+
+type PortfolioTransaction = {
+    Symbol: string
+    TransactionType: TransactionType
+    Shares: int
+    Price: decimal // Always 4 decimal places
+    Date: DateTime
+}
+
+[<CLIMutable>]
+type PortfolioTransactionDb = {
+    Symbol: string
+    TransactionType: string
+    Shares: int
+    Price: decimal // Always 4 decimal places
+    Date: DateTime
 }
 
 type CurrentPortfolioRecord = {
     Symbol: string
-    Shares: int
-    AveragePrice: decimal
+    Transactions: PortfolioTransaction list
 }
 
 type IndexType = 
@@ -38,7 +61,7 @@ type IndexType =
 type TableStockRecord = {
     Symbol: string
     Name: string
-    Price: decimal
+    Price: decimal 
     Weight: decimal
 }
 

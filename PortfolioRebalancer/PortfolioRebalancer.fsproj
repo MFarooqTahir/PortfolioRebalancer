@@ -8,7 +8,7 @@
 	<ItemGroup>
 		<Compile Include="Types.fs" />
 		<Compile Include="Helpers.fs" />
-		<Compile Include="DataRetriever.fs" />
+		<Compile Include="Db.fs" />
 		<Compile Include="Scraper.fs" />
 		<Compile Include="Table.fs" />
 		<Compile Include="Rebalancer.fs" />
@@ -17,6 +17,11 @@
 
 	<ItemGroup>
 		<PackageReference Include="CsvHelper" Version="33.1.0" />
+		<PackageReference Include="Dapper" Version="2.1.66" />
+		<PackageReference Include="Dapper.FSharp" Version="4.9.0" />
+		<PackageReference Include="FSharp.SystemTextJson" Version="1.4.36" />
+		<PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.7" />
+		<PackageReference Include="Npgsql" Version="9.0.3" />
 		<PackageReference Include="Selenium.Support" Version="4.34.0" />
 		<PackageReference Include="Selenium.WebDriver" Version="4.34.0" />
 		<PackageReference Include="Selenium.WebDriver.ChromeDriver" Version="138.0.7204.15700" />
