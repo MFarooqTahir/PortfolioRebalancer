@@ -1,6 +1,5 @@
 ﻿module Types
 open System
-open System.Text.Json.Serialization
 
 type ScrapingError = 
     | NavigationError of string
@@ -12,22 +11,22 @@ type ScrapingError =
 [<CLIMutable>]
 type IndexTableRecord = {
     Symbol: string
-    Weight: decimal // Always 4 decimal places
+    Weight: decimal
 }
 
 [<CLIMutable>]
 type IndexTableWithPrice = {
     Symbol: string
     Name: string
-    Weight: decimal // Always 4 decimal places
-    Price: decimal // Always 4 decimal places
+    Weight: decimal 
+    Price: decimal 
 }
 
 [<CLIMutable>]
 type StockRecord = {
     Symbol: string
     Name: string
-    Price: decimal // Always 4 decimal places
+    Price: decimal 
 }
 
 type TransactionType = Buy | Sell
@@ -36,7 +35,7 @@ type PortfolioTransaction = {
     Symbol: string
     TransactionType: TransactionType
     Shares: int
-    Price: decimal // Always 4 decimal places
+    Price: decimal 
     Date: DateTime
 }
 
@@ -45,7 +44,7 @@ type PortfolioTransactionDb = {
     Symbol: string
     TransactionType: string
     Shares: int
-    Price: decimal // Always 4 decimal places
+    Price: decimal 
     Date: DateTime
 }
 

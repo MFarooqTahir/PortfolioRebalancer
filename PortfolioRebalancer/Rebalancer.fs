@@ -126,130 +126,101 @@ let BalanceIndexAsync (cash: decimal) (reinvestRemainingCash: bool) = async {
     return ()
 }
 
-let RebalanceCurrentPortfolioAsync cash reinvestRemainingCash = async {
+let RebalanceCurrentPortfolioAsync (cash: decimal) (reinvestRemainingCash: bool) = async {
     let! indexRecords = getIndexRecordsAsync()
     let! individualStockData = getStockRecordsAsync()
     let! transactionsDb = getPortfolioTransactionsAsync()
-    let transactions = transactionsDb |> List.map toDomain
-    let priceMap : Map<string, decimal> = individualStockData |> List.map (fun s -> s.Symbol, s.Price) |> Map.ofList
-    let weightMap : Map<string, decimal> = indexRecords |> List.map (fun r -> r.Symbol, r.Weight) |> Map.ofList
-    let currentMap : Map<string, PortfolioTransaction list> =
-        transactions
+    let priceMap = individualStockData |> List.map (fun s -> s.Symbol, s.Price) |> Map.ofList
+    let weightMap = indexRecords |> List.map (fun r -> r.Symbol, r.Weight) |> Map.ofList
+    let getName symbol = individualStockData |> List.tryFind (fun s -> s.Symbol = symbol) |> Option.map (fun s -> s.Name) |> Option.defaultValue "-"
+    let getPrice symbol = priceMap |> Map.tryFind symbol |> Option.defaultValue 0m
+    // 1. Get current portfolio (symbol -> shares) using FIFO lot logic
+    let currentSharesMap =
+        transactionsDb
         |> List.groupBy (fun t -> t.Symbol)
         |> Map.ofList
+        |> Map.map (fun _ txnsDb ->
+            let shares, _ = Db.getCurrentLotsAndAvgPrice txnsDb
+            shares
+        )
+    // 2. Get all symbols in current portfolio or index
+    let allSymbols =
+        Set.union (currentSharesMap |> Map.toList |> List.map fst |> Set.ofList)
+                  (indexRecords |> List.map (fun idx -> idx.Symbol) |> Set.ofList)
+        |> Set.toList
+    // 3. Compute current portfolio value
     let currentPortfolioValue =
-        currentMap
-        |> Map.toList
-        |> List.sumBy (fun (symbol, txns) ->
-            let price = priceMap |> Map.tryFind symbol |> Option.defaultValue 0m
-            let totalShares = txns |> List.sumBy (fun t -> t.Shares)
-            decimal totalShares * price)
-    let targetPortfolioValue = currentPortfolioValue + cash
-    let getTargetShares symbol =
-        let price = priceMap |> Map.tryFind symbol |> Option.defaultValue 0m
-        let weight = weightMap |> Map.tryFind symbol |> Option.defaultValue 0m
-        if price > 0m then int (targetPortfolioValue * weight / price) else 0
-    let getTargetValue symbol =
-        let weight = weightMap |> Map.tryFind symbol |> Option.defaultValue 0m
-        targetPortfolioValue * weight
-    // --- New portfolio state for transactions ---
-    let mutable portfolioTxnsMap : Map<string, PortfolioTransaction list> =
-        transactions
-        |> List.groupBy (fun t -> t.Symbol)
+        currentSharesMap |> Map.toList |> List.sumBy (fun (symbol, shares) -> decimal shares * getPrice symbol)
+    let totalValue = currentPortfolioValue + cash
+    // 4. Compute target shares for each symbol
+    let targetSharesMap =
+        allSymbols
+        |> List.map (fun symbol ->
+            let price = getPrice symbol
+            let weight = weightMap |> Map.tryFind symbol |> Option.defaultValue 0m
+            let targetValue = totalValue * weight
+            let shares = if price > 0m then int (targetValue / price) else 0
+            symbol, shares)
         |> Map.ofList
-    let mutable totalCGT = 0m
-    let mutable totalCDC = 0m
-    // Process sells
-    for symbol in currentMap |> Map.toList |> List.map fst do
-        let txns = portfolioTxnsMap |> Map.tryFind symbol |> Option.defaultValue []
-        let price = priceMap |> Map.tryFind symbol |> Option.defaultValue 0m
-        let weight = weightMap |> Map.tryFind symbol |> Option.defaultValue 0m
-        let totalShares = txns |> List.sumBy (fun t -> t.Shares)
-        let targetShares = getTargetShares symbol
-        let today = System.DateTime.UtcNow
-        if weight = 0m && totalShares > 0 && price > 0m then
-            let sharesToSell = totalShares
-            let cgtRate = getCGTRate (txns |> List.head).Date today
-            let cgt = max (decimal sharesToSell * (price - (txns |> List.head).Price) * cgtRate) 0m
-            let cdc = calculateCDCCharges (decimal sharesToSell * price)
-            let txn: PortfolioTransaction = { Symbol = symbol; TransactionType = TransactionType.Sell; Shares = sharesToSell; Price = price; Date = today }
-            let updatedTxns = txn::(txns |> List.filter (fun t -> t.Symbol <> symbol))
-            portfolioTxnsMap <- portfolioTxnsMap.Add(symbol, updatedTxns)
-            totalCGT <- totalCGT + cgt
-            totalCDC <- totalCDC + cdc
-        elif totalShares > targetShares && price > 0m then
-            let sharesToSell = totalShares - targetShares
-            let cgtRate = getCGTRate (txns |> List.head).Date today
-            let cgt = max (decimal sharesToSell * (price - (txns |> List.head).Price) * cgtRate) 0m
-            let cdc = calculateCDCCharges (decimal sharesToSell * price)
-            let txn: PortfolioTransaction = { Symbol = symbol; TransactionType = TransactionType.Sell; Shares = sharesToSell; Price = price; Date = today }
-            let updatedTxns = txn::(txns |> List.filter (fun t -> t.Symbol <> symbol))
-            portfolioTxnsMap <- portfolioTxnsMap.Add(symbol, updatedTxns)
-            totalCGT <- totalCGT + cgt
-            totalCDC <- totalCDC + cdc
-    // Process buys
-    for idx in indexRecords do
-        let price = priceMap |> Map.tryFind idx.Symbol |> Option.defaultValue 0m
-        let targetShares = getTargetShares idx.Symbol
-        let currentShares = currentMap |> Map.tryFind idx.Symbol |> Option.defaultValue [] |> List.sumBy (fun t -> t.Shares)
-        let sharesToBuy = targetShares - currentShares
-        let today = System.DateTime.UtcNow
-        if sharesToBuy > 0 && price > 0m then
-            let txns = portfolioTxnsMap |> Map.tryFind idx.Symbol |> Option.defaultValue []
-            let cdc = calculateCDCCharges (price * decimal sharesToBuy)
-            totalCDC <- totalCDC + cdc
-    // --- Reporting ---
-    printfn "Total CGT paid: %M" totalCGT
-    printfn "Total CDC charges: %M" totalCDC
-    // Reinvest remaining cash if requested
-    let mutable finalPortfolioTxnsMap = portfolioTxnsMap
-    let mutable finalCash = decimal cash
-    let mutable reinvested = false
-    if reinvestRemainingCash then
-        let rec reinvestLoop remainingCash iterationCount =
-            if iterationCount > 20 || remainingCash <= 0m then
-                ()
-            else
-                let candidates =
-                    indexRecords
-                    |> List.choose (fun idx ->
-                        let price = priceMap |> Map.tryFind idx.Symbol |> Option.defaultValue 0m
-                        let txns = finalPortfolioTxnsMap |> Map.tryFind idx.Symbol |> Option.defaultValue []
-                        if price > 0m then
-                            let commission = calculateCommission price 1
-                            let totalCost = price + commission
-                            if totalCost <= remainingCash then
-                                Some (idx.Symbol, price, txns, commission, totalCost)
-                            else None
-                        else None)
-                    |> List.sortByDescending (fun (_, _, txns, _, _) -> txns |> List.sumBy (fun t -> t.Shares))
-                match candidates with
-                | [] -> ()
-                | (symbol, price, txns, commission, totalCost) :: _ ->
-                    let today = System.DateTime.UtcNow
-                    let cdc = calculateCDCCharges (price * decimal 1)
-                    totalCDC <- totalCDC + cdc
-                    reinvestLoop (remainingCash - totalCost) (iterationCount + 1)
-        let initialCash =
-            indexRecords
-            |> List.sumBy (fun idx ->
-                let price = priceMap |> Map.tryFind idx.Symbol |> Option.defaultValue 0m
-                let txns = finalPortfolioTxnsMap |> Map.tryFind idx.Symbol |> Option.defaultValue []
-                decimal (txns |> List.sumBy (fun t -> t.Shares)) * price)
-        let cashLeft = decimal cash - initialCash
-        reinvestLoop cashLeft 0
-    // Show final portfolio
+    // 5. Sells: for each symbol, if current > target, sell the difference
+    let mutable cashAvailable = cash
+    let mutable sharesMap = currentSharesMap
+    let mutable sellActions = []
+    for symbol in allSymbols do
+        let currentShares = sharesMap |> Map.tryFind symbol |> Option.defaultValue 0
+        let targetShares = targetSharesMap |> Map.tryFind symbol |> Option.defaultValue 0
+        let price = getPrice symbol
+        if currentShares > targetShares && price > 0m then
+            let sharesToSell = currentShares - targetShares
+            let value = decimal sharesToSell * price
+            let commission = calculateCommission price sharesToSell
+            let cgt = value * getCGTRate (System.DateTime.UtcNow.AddYears(-2)) System.DateTime.UtcNow
+            let net = value - commission - cgt
+            cashAvailable <- cashAvailable + net
+            sharesMap <- sharesMap.Add(symbol, currentShares - sharesToSell)
+            sellActions <- ({ Symbol = symbol; Name = getName symbol; TargetWeight = weightMap |> Map.tryFind symbol |> Option.defaultValue 0m; CurrentPrice = price; ActualShares = currentShares; ActualValue = decimal currentShares * price; Commission = commission; TotalCost = net }, sharesToSell, value, commission, cgt) :: sellActions
+    // 6. Buys: for each symbol, if current < target, buy as many as possible up to the difference, but never more than available cash
+    let mutable buyActions = []
+    for symbol in allSymbols do
+        let currentShares = sharesMap |> Map.tryFind symbol |> Option.defaultValue 0
+        let targetShares = targetSharesMap |> Map.tryFind symbol |> Option.defaultValue 0
+        let price = getPrice symbol
+        if targetShares > currentShares && price > 0m then
+            let sharesToBuy = targetShares - currentShares
+            let value = decimal sharesToBuy * price
+            let commission = calculateCommission price sharesToBuy
+            let total = value + commission
+            let maxAffordableShares =
+                if total <= cashAvailable then sharesToBuy
+                else
+                    let perShareCost = price + (commission / decimal sharesToBuy)
+                    let affordable = int (cashAvailable / perShareCost)
+                    min affordable sharesToBuy
+            if maxAffordableShares > 0 then
+                let buyValue = decimal maxAffordableShares * price
+                let buyCommission = calculateCommission price maxAffordableShares
+                let buyTotal = buyValue + buyCommission
+                cashAvailable <- cashAvailable - buyTotal
+                sharesMap <- sharesMap.Add(symbol, currentShares + maxAffordableShares)
+                buyActions <- ({ Symbol = symbol; Name = getName symbol; TargetWeight = weightMap |> Map.tryFind symbol |> Option.defaultValue 0m; CurrentPrice = price; ActualShares = currentShares; ActualValue = decimal currentShares * price; Commission = buyCommission; TotalCost = buyTotal }, maxAffordableShares, buyValue, buyCommission) :: buyActions
+    // 7. Build final portfolio
     let finalPortfolio =
-        finalPortfolioTxnsMap
-        |> Map.toList
-        |> List.choose (fun (symbol, txns) ->
-            let price = priceMap |> Map.tryFind symbol |> Option.defaultValue 0m
-            let totalShares = txns |> List.sumBy (fun t -> t.Shares)
-            if totalShares > 0 && price > 0m then
-                Some (symbol, totalShares, price, decimal totalShares * price)
-            else None)
-    ShowFinalPortfolio finalPortfolio finalCash
-    if reinvested then
-        printfn "Note: Remaining cash was reinvested. This may reduce balance accuracy to minimize unused cash."
-    ()
+        allSymbols
+        |> List.choose (fun symbol ->
+            let shares = sharesMap |> Map.tryFind symbol |> Option.defaultValue 0
+            let price = getPrice symbol
+            if shares > 0 && price > 0m then Some (symbol, getName symbol, shares, price, decimal shares * price) else None)
+        |> List.sortByDescending (fun (_,_,_,_,value) -> value)
+    let sellActionsSorted = sellActions |> List.sortByDescending (fun (_,_,value,_,_) -> value)
+    let buyActionsSorted = buyActions |> List.sortByDescending (fun (_,_,value,_) -> value)
+    let totalSellCommission = sellActions |> List.sumBy (fun (_,_,_,commission,_) -> commission)
+    let totalSellTax = sellActions |> List.sumBy (fun (_,_,_,_,tax) -> tax)
+    let proceedsFromSells = sellActions |> List.sumBy (fun (_,_,value,commission,tax) -> value - commission - tax)
+    let totalBuyCommission = buyActions |> List.sumBy (fun (_,_,_,commission) -> commission)
+    let costOfBuys = buyActions |> List.sumBy (fun (_,_,value,commission) -> value + commission)
+    Table.ShowRebalanceActionsWithTax "=== Sells Required ===" sellActionsSorted true totalSellCommission totalSellTax proceedsFromSells (cash + proceedsFromSells)
+    let buyActionsWithTax = buyActionsSorted |> List.map (fun (a,b,c,d) -> (a,b,c,d,0m))
+    Table.ShowRebalanceActionsWithTax "=== Buys Required ===" buyActionsWithTax false totalBuyCommission 0m costOfBuys cashAvailable
+    Table.ShowFinalPortfolioWithNamesAndCash finalPortfolio cashAvailable
+    return ()
 }

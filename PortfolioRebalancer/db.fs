@@ -114,6 +114,32 @@
         do! insert { into txnTable; values (transactions |> List.map fromDomain) } |> conn.InsertAsync |> Async.AwaitTask |> Async.Ignore
     }
 
+    let getCurrentLotsAndAvgPriceFromTxns (txns: PortfolioTransaction list) : int * decimal =
+        let sorted = txns |> List.sortBy (fun t -> t.Date)
+        let rec processLotCalculations lots (txns: PortfolioTransaction list) =
+            match txns with
+            | [] -> lots
+            | t::rest ->
+                match t.TransactionType with
+                | TransactionType.Buy -> processLotCalculations (lots @ [t.Shares, t.Price]) rest
+                | TransactionType.Sell ->
+                    let rec remove n lots =
+                        match n, lots with
+                        | 0, _ -> lots
+                        | _, [] -> []
+                        | n, (s, p)::restLots ->
+                            if s > n then (s - n, p)::restLots
+                            else remove (n - s) restLots
+                    processLotCalculations (remove t.Shares lots) rest
+        let finalLots = processLotCalculations [] sorted
+        let totalShares = finalLots |> List.sumBy fst
+        let totalCost = finalLots |> List.sumBy (fun (s, p) -> decimal s * p)
+        let avgPrice = if totalShares > 0 then totalCost / decimal totalShares else 0m
+        totalShares, avgPrice
+
+    let getCurrentLotsAndAvgPrice (txnsDb: PortfolioTransactionDb list) : int * decimal =
+        txnsDb |> List.map toDomain |> getCurrentLotsAndAvgPriceFromTxns
+
     [<CLIMutable>]
     type HistoricTrade = {
         trade_no: string
