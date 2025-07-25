@@ -21,73 +21,54 @@ let printErrors (result: Result<unit, ScrapingError>) =
     | _ -> ()
 
 let main() = async {
-    do! Db.ensureTablesAsync()
-    let! indexRecords = Db.getIndexRecordsAsync()
-    let url = "https://dps.psx.com.pk/indices"
-    let portfolioImport = "C:\\portfolio_trades.json" // Hardcoded path
-
-
+    do! ensureTablesAsync()
     let mutable continueRunning = true
     while continueRunning do
-        printfn "\nChoose an option:"
-        printfn "1. Re Construct index cache"
-        printfn "2. Show index and current porfolio"
-        printfn "3. Balance index using cash"
-        printfn "4. Re-Balance current portfolio with cash"
-        printfn "5. Import portfolio from JSON file (hardcoded path)"
-        printfn "6. View transaction history and current portfolio"
-        printfn "7. Exit"
-        printf "Enter your choice (1-7): "
-        let choice = Console.ReadLine()
-        match choice with
+        printfn "\nPortfolio Rebalancer"
+        printfn "1. Show Index and Current Portfolio"
+        printfn "2. Import Current Portfolio from JSON"
+        printfn "3. Rebalance Index with Cash (optionally show commission)"
+        printfn "4. Rebalance Current Portfolio with Cash (optionally show commission)"
+        printfn "5. Get Index and Stock Data (scrape and save both to DB)"
+        printfn "0. Exit"
+        printf "Select an option: "
+        match Console.ReadLine() with
         | "1" ->
-            printf "\nDo you want to get latest prices as well? (y/n): "
-            let getLatestPricesInput = Console.ReadLine()
-            let getLatest = getLatestPricesInput.Equals("y")
-            let! result = ConstructIndexCache url getLatest
-            printErrors result
+            showSimpleCurrentPortfolio () |> Async.RunSynchronously
         | "2" ->
-            let! result = ShowIndexAndPortfolio url
-            printErrors result
+            importCurrentPortfolioFromJson () |> Async.RunSynchronously
         | "3" ->
-            printf "\nEnter the amount of cash available for rebalancing: "
-            let cashInput = Console.ReadLine()
-            match cashInput.Replace(",", "") with
-            | ValidDecimal cash when cash > 0m ->
-                printf "\nReinvest remaining cash? (This may reduce balance accuracy but minimizes unused cash) (y/n): "
-                let reinvestInput = Console.ReadLine()
-                let reinvestRemainingCash = reinvestInput.Equals("y", StringComparison.OrdinalIgnoreCase)
-                printf "\nCalculate commission on buy orders? (y/n): "
-                let commissionInput = Console.ReadLine()
-                let calcCommission = commissionInput.Equals("y", StringComparison.OrdinalIgnoreCase)
-                do! BalanceIndexAsync cash reinvestRemainingCash calcCommission
-            | _ ->
-                printfn "Invalid cash amount. Please enter a valid decimal number."  
+            printf "Enter cash amount: "
+            match System.Console.ReadLine() |> System.Decimal.TryParse with
+            | true, cash when cash > 0m ->
+                printf "Include commission? (y/n): "
+                let commissionInput = System.Console.ReadLine()
+                let includeCommission = commissionInput.Trim().ToLower() = "y"
+                let index = getIndexRecordsAsync () |> Async.RunSynchronously
+                let prices = getStockRecordsAsync () |> Async.RunSynchronously
+                Rebalancer.rebalanceAndDisplay "index" includeCommission cash index [] prices
+            | _ -> printfn "Invalid cash amount."
         | "4" ->
-            printf "\nEnter the amount of cash available for rebalancing: "
-            let cashInput = Console.ReadLine()
-            match cashInput with
-            | ValidDecimal cash ->
-                printf "\nReinvest remaining cash? (This may reduce balance accuracy but minimizes unused cash) (y/n): "
-                let reinvestInput = Console.ReadLine()
-                let reinvestRemainingCash = reinvestInput.Equals("y", StringComparison.OrdinalIgnoreCase)
-                printf "\nShow estimated taxes? (y/n): "
-                let showTaxInput = Console.ReadLine()
-                let showTaxes = showTaxInput.Equals("y", StringComparison.OrdinalIgnoreCase)
-                do! RebalanceCurrentPortfolioAsync cash reinvestRemainingCash showTaxes
-            | _ ->
-                printfn "Invalid cash amount. Please enter a valid decimal number."
+            printf "Enter cash amount: "
+            match System.Console.ReadLine() |> System.Decimal.TryParse with
+            | true, cash when cash >= 0m ->
+                printf "Include commission? (y/n): "
+                let commissionInput = System.Console.ReadLine()
+                let includeCommission = commissionInput.Trim().ToLower() = "y"
+                let index = getIndexRecordsAsync () |> Async.RunSynchronously
+                let current = getCurrentPortfolioAsync () |> Async.RunSynchronously
+                let prices = getStockRecordsAsync () |> Async.RunSynchronously
+                Rebalancer.rebalanceAndDisplay "current" includeCommission cash index current prices
+            | _ -> printfn "Invalid cash amount."
         | "5" ->
-            do! PortfolioImporter.importPortfolioFromFile portfolioImport
-            printfn "Portfolio imported and upserted from %s" portfolioImport
-        | "6" ->
-            do! showTransactionHistory ()
-            do! showCurrentPortfolio ()
-        | "7" ->
-            printfn "Exiting program..."
+            let url = "https://dps.psx.com.pk/indices"
+            let! result = Scraper.ConstructIndexCache url true
+            printErrors result
+        | "0" ->
+            printfn "Exiting."
             continueRunning <- false
         | _ ->
-            printfn "Invalid choice. Please try again."
-    printfn "------------ Program Ended ------------"
+            printfn "Invalid option."
 }
+
 main() |> Async.RunSynchronously |> ignore

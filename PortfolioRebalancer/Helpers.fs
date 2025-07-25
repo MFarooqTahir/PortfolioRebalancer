@@ -19,19 +19,26 @@ let toPercentage (value: decimal) =
 
 let (|ValidDecimal|_|) (str: string) =
     match Decimal.TryParse(str.Replace(",", "")) with
-    | (true, value) -> Some value
+    | true, value -> Some value
     | _ -> None
 
 let (|ValidWeight|_|) (str: string) =
     let cleanStr = str.Replace("%", "").Trim()
     match Decimal.TryParse(cleanStr) with
-    | (true, weight) when weight > 0m -> Some (weight / 100m)
+    | true, weight when weight > 0m -> Some (weight / 100m)
     | _ -> None
 
 let ToWeightMap (indexRecord: IndexTableRecord list) =
     indexRecord
         |> List.map(fun x -> x.Symbol, x.Weight)
         |> Map.ofList
+
+type StockDisplayTableRecord = {
+    Weight: decimal
+    Symbol: string
+    Name: string
+    Price: decimal
+}
 
 let ToStockTableRecord indexRecords (individualStockData: StockRecord list)=
     let weightMap = indexRecords |> ToWeightMap

@@ -1,387 +1,194 @@
 ﻿module Table
 
 open Spectre.Console
+open System.IO
+open System.Text.Json
+open System.Text.Json.Serialization
 open Types
 open Helpers
-open Db
 
-let getTotalCGTFromTxns (txns: PortfolioTransaction list) : decimal =
-    let rec processTaxes (txns: PortfolioTransaction list) (lots: (int * decimal * System.DateTime) list) (accCGT: decimal) =
-        match txns with
-        | [] -> accCGT
-        | t::rest ->
-            match t.TransactionType with
-            | TransactionType.Buy ->
-                processTaxes rest ((t.Shares, t.Price, t.Date)::lots : (int * decimal * System.DateTime) list) accCGT
-            | TransactionType.Sell ->
-                let rec sell sharesToSell (lots: (int * decimal * System.DateTime) list) accCGT =
-                    match sharesToSell, lots with
-                    | 0, _ -> lots, accCGT
-                    | _, [] -> ([] : (int * decimal * System.DateTime) list), accCGT // Selling more than you have, ignore
-                    | n, (lotShares, lotPrice, lotDate)::restLots ->
-                        let sellCount = min n lotShares
-                        let gain = (t.Price - lotPrice) * decimal sellCount
-                        let holdingPeriod = (t.Date - lotDate).TotalDays / 365.0
-                        let cgtRate =
-                            if holdingPeriod <= 1.0 then 0.15M
-                            elif holdingPeriod <= 2.0 then 0.125M
-                            elif holdingPeriod <= 3.0 then 0.10M
-                            elif holdingPeriod <= 4.0 then 0.075M
-                            elif holdingPeriod <= 5.0 then 0.05M
-                            elif holdingPeriod <= 6.0 then 0.025M
-                            else 0.0M
-                        let cgt = max (gain * cgtRate) 0m
-                        let newLot = if lotShares > sellCount then (lotShares - sellCount, lotPrice, lotDate)::restLots else restLots
-                        sell (n - sellCount) (newLot : (int * decimal * System.DateTime) list) (accCGT + cgt)
-                let newLots, newCGT = sell t.Shares lots accCGT
-                processTaxes rest (newLots : (int * decimal * System.DateTime) list) newCGT
-    processTaxes (List.sortBy (fun t -> t.Date) txns) ([] : (int * decimal * System.DateTime) list) 0m
-
-let getSharesAndAvgPriceFromTxns (txns: PortfolioTransaction list) : int * decimal =
-    let totalBuys = txns |> List.filter (fun t -> t.TransactionType = TransactionType.Buy)
-    let totalShares = totalBuys |> List.sumBy (fun t -> t.Shares)
-    let totalCost = totalBuys |> List.sumBy (fun t -> decimal t.Shares * t.Price)
-    let avgPrice = if totalShares > 0 then totalCost / decimal totalShares else 0m
-    totalShares, avgPrice
-
-// === Main Portfolio Table Display ===
-let ShowIndexAndPortfolio url = async {
-    do! ensureTablesAsync()
-    let! indexRecords = getIndexRecordsAsync()
-    let! individualStocks = getStockRecordsAsync()
-    match indexRecords with
-    | [] -> ()
-    | _ ->
+let showSimpleCurrentPortfolio () = async {
+    let! indexRecords = Db.getIndexRecordsAsync()
+    let! stockRecords = Db.getStockRecordsAsync()
+    let! records = Db.getCurrentPortfolioAsync()
+    let indexTable =
         Table()
-        |> fun indexTable ->
-            indexTable.Title "=== Index ==="
-            |> ignore
-            indexTable.AddColumns("Symbol", "Name", "Price", "Weight")
-            |> ignore
-            ToStockTableRecord indexRecords individualStocks
-            |> List.sortByDescending (fun r -> r.Weight)
-            |> List.iter (fun r -> indexTable.AddRow(r.Symbol, r.Name, sprintf "%.4g" r.Price, toPercentage (decimal r.Weight)) |> ignore)
-            AnsiConsole.Write(indexTable)
-    let! transactionsDb = getPortfolioTransactionsAsync()
-    match transactionsDb with
-    | [] -> ()
-    | _ ->
-        let symbolList = transactionsDb |> List.map (fun t -> t.Symbol) |> List.distinct
-        let stockMap = individualStocks |> List.map (fun s -> s.Symbol, s) |> Map.ofList
-        let portfolioSymbols = symbolList
-        Table()
-        |> fun portfolioTable ->
-            portfolioTable.Title "=== Current Portfolio ==="
-            |> ignore
-            portfolioTable.AddColumns("Symbol", "Name", "Shares", "Avg Price", "Market Price", "Market Value", "Invested Value", "Gain/Loss", "Gain/Loss %", "Total Tax Paid")
-            |> ignore
-            portfolioSymbols
-            |> List.iter (fun symbol ->
-                let txnsDb = transactionsDb |> List.filter (fun t -> t.Symbol = symbol)
-                let totalShares, avgPrice = Db.getCurrentLotsAndAvgPrice txnsDb
-                let marketPrice = Map.tryFind symbol stockMap |> Option.map (fun s -> s.Price) |> Option.defaultValue 0m
-                let marketValue = decimal totalShares * marketPrice
-                let investedValue = decimal totalShares * avgPrice
-                let gainLoss = marketValue - investedValue
-                let gainLossPct = if investedValue <> 0m then (gainLoss / investedValue) * 100m else 0m
-                let totalTax = getTotalCGTFromTxns (txnsDb |> List.map Db.toDomain)
-                portfolioTable.AddRow(
-                    symbol,
-                    Map.tryFind symbol stockMap |> Option.map (fun s -> s.Name) |> Option.defaultValue "-",
-                    string totalShares,
-                    sprintf "%.4g" avgPrice,
-                    sprintf "%.4g" marketPrice,
-                    formatPKR marketValue,
-                    formatPKR investedValue,
-                    formatPKR gainLoss,
-                    sprintf "%.2f%%" gainLossPct,
-                    formatPKR totalTax
-                ) |> ignore)
-            AnsiConsole.Write(portfolioTable)
-            // --- Totals ---
-            // Calculate stats using only current lots
-            let lotsBySymbol =
-                portfolioSymbols
-                |> List.map (fun symbol ->
-                    let txnsDb = transactionsDb |> List.filter (fun t -> t.Symbol = symbol)
-                    let shares, avgPrice = Db.getCurrentLotsAndAvgPrice txnsDb
-                    let marketPrice = Map.tryFind symbol stockMap |> Option.map (fun s -> s.Price) |> Option.defaultValue 0m
-                    symbol, shares, avgPrice, marketPrice)
-                |> List.filter (fun (_, shares, _, _) -> shares > 0)
-            let totalInvested = lotsBySymbol |> List.sumBy (fun (_, shares, avgPrice, _) -> decimal shares * avgPrice)
-            let totalCurrentValue = lotsBySymbol |> List.sumBy (fun (_, shares, _, marketPrice) -> decimal shares * marketPrice)
-            let gainLoss = totalCurrentValue - totalInvested
-            let gainLossPct = if totalInvested <> 0m then (gainLoss / totalInvested) * 100m else 0m
-            let numHoldings = lotsBySymbol |> List.length
-            AnsiConsole.MarkupLine $"[bold]Current Invested Value:[/] {formatPKR totalInvested}"
-            AnsiConsole.MarkupLine $"[bold]Current Market Value:[/] {formatPKR totalCurrentValue}"
-            AnsiConsole.MarkupLine $"[bold]Total Gain/Loss:[/] {formatPKR gainLoss} ({gainLossPct:N2}%%)"
-            AnsiConsole.MarkupLine $"[bold]Number of Holdings:[/] {numHoldings}"
-    return Ok ()
-}
-let ShowRebalanceResult portfolioPosition finalCash =
+            .Title("=== Index Records ===")
+            .AddColumns [|"Symbol"; "Weight %"; "Price"|]
+    let priceMap = stockRecords |> List.map (fun s -> s.Symbol, s.Price) |> Map.ofList
+    match indexRecords |> List.sortByDescending (fun s -> s.Weight) with
+    | [] -> indexTable.AddRow("[red]No data[/]", "-", "-") |> ignore
+    | xs ->
+        xs |> List.iter (fun s ->
+            let price = Map.tryFind s.Symbol priceMap |> Option.defaultValue 0m
+            let weightPct = toPercentage s.Weight
+            indexTable.AddRow(s.Symbol, weightPct, formatPKR price) |> ignore)
+    AnsiConsole.Write(indexTable)
     let table =
-            Table()
-                .Title("=== Rebalanced Portfolio ===")
-                .AddColumns("Symbol", "Name", "Weight", "Price", "Shares", "Value", "Commission", "Total Cost")
-
-    portfolioPosition
-        |> List.sortByDescending (fun p -> p.TargetWeight)
-        |> List.iter (fun p ->
+        Table()
+            .Title("=== My Current Portfolio ===")
+            .AddColumns [|"Symbol"; "Shares"; "Buy Price"; "Current Price"; "Value"; "Gain/Loss"; "Gain/Loss %"|]
+    let sortedRecords =
+        records
+        |> List.map (fun s ->
+            let currentPrice = Map.tryFind s.Symbol priceMap |> Option.defaultValue 0m
+            let value = decimal s.Shares * currentPrice
+            let cost = decimal s.Shares * s.Price
+            let gainLoss = value - cost
+            let gainLossPct = if cost <> 0m then gainLoss / cost else 0m
+            (s, currentPrice, value, cost, gainLoss, gainLossPct))
+        |> List.sortByDescending (fun (_,_,value,_,_,_) -> value)
+    match sortedRecords with
+    | [] -> table.AddRow("[red]No data[/]", "-", "-", "-", "-", "-", "-") |> ignore
+    | xs ->
+        xs |> List.iter (fun (s, currentPrice, value, cost, gainLoss, gainLossPct) ->
             table.AddRow(
-                p.Symbol,
-                p.Name,
-                toPercentage p.TargetWeight,
-                formatPKR p.CurrentPrice,
-                p.ActualShares.ToString(),
-                formatPKR p.ActualValue,
-                formatPKR p.Commission,
-                formatPKR p.TotalCost
-            ) |> ignore
-        )
-
-    let totalUsed = portfolioPosition |> List.sumBy (fun p -> p.TotalCost)
-    let totalCommission = portfolioPosition |> List.sumBy (fun p -> p.Commission)
-
+                s.Symbol,
+                string s.Shares,
+                formatPKR s.Price,
+                formatPKR currentPrice,
+                formatPKR value,
+                formatPKR gainLoss,
+                toPercentage gainLossPct) |> ignore)
     AnsiConsole.Write(table)
-    AnsiConsole.MarkupLine $"[bold]Total Cash Used:[/] {formatPKR totalUsed}"
-    AnsiConsole.MarkupLine $"[bold]Total Commission:[/] {formatPKR totalCommission}"
-    AnsiConsole.MarkupLine $"[bold]Total Cash Left:[/] {formatPKR finalCash}"
-        
-    
-let ShowFinalPortfolio finalPortfolio finalCash =
-    let table =
-        Table()
-            .Title("=== Final Portfolio After Rebalancing ===")
-            .AddColumns("Symbol", "Shares", "Unit Price", "Value")
-
-    finalPortfolio
-    |> List.sortByDescending (fun (_, _, _, value) -> value)
-    |> List.iter (fun (symbol, shares, unitPrice, value) ->
-        table.AddRow(
-            symbol,
-            shares.ToString(),
-            formatPKR unitPrice,
-            formatPKR value
-        ) |> ignore
-    )
-
-    AnsiConsole.Write(table)
-    AnsiConsole.MarkupLine $"[bold]Final Cash Left:[/] {formatPKR finalCash}"
-
-let ShowRebalanceActions (title: string) (actions: (PortfolioPosition * int * decimal * decimal) list) (isSell: bool) =
-    let table =
-        Table()
-            .Title(title)
-            .AddColumns([|"Action"; "Symbol"; "Name"; "Shares"; "Price"; "Value"; "Commission"; "Total"|])
-    actions
-    |> List.iter (fun (pos, shares, value, commission) ->
-        let action = if isSell then "Sell" else "Buy"
-        table.AddRow(
-            action,
-            pos.Symbol,
-            pos.Name,
-            shares.ToString(),
-            formatPKR pos.CurrentPrice,
-            formatPKR value,
-            formatPKR commission,
-            formatPKR (if isSell then value - commission else value + commission)
-        ) |> ignore)
-    AnsiConsole.Write(table)
-
-let ShowRebalanceActionsNoTax (title: string) (actions: (PortfolioPosition * int * decimal * decimal) list) (isSell: bool) (totalCommission: decimal) (totalValue: decimal) (cashAfter: decimal) =
-    let table =
-        Table()
-            .Title(title)
-            .AddColumns([|"Action"; "Symbol"; "Name"; "Shares"; "Price"; "Value"; "Commission"; "Total"|])
-    actions
-    |> List.iter (fun (pos, shares, value, commission) ->
-        let action = if isSell then "Sell" else "Buy"
-        table.AddRow(
-            action,
-            pos.Symbol,
-            pos.Name,
-            shares.ToString(),
-            formatPKR pos.CurrentPrice,
-            formatPKR value,
-            formatPKR commission,
-            formatPKR (if isSell then value - commission else value + commission)
-        ) |> ignore)
-    AnsiConsole.Write(table)
-    AnsiConsole.MarkupLine $"[bold]Total Commission:[/] {formatPKR totalCommission}"
-    if isSell then
-        AnsiConsole.MarkupLine $"[bold]Total Proceeds After Commission:[/] {formatPKR totalValue}"
-        AnsiConsole.MarkupLine $"[bold]Cash After Sells:[/] {formatPKR cashAfter}"
-    else
-        AnsiConsole.MarkupLine $"[bold]Total Cost of Buys (incl. commission):[/] {formatPKR totalValue}"
-        AnsiConsole.MarkupLine $"[bold]Cash After Buys:[/] {formatPKR cashAfter}"
-
-let ShowFinalPortfolioWithNames (finalPortfolio: (string * int * decimal * decimal * string) list) =
-    let table =
-        Table()
-            .Title("=== Final Portfolio After Rebalancing ===")
-            .AddColumns([|"Symbol"; "Name"; "Shares"; "Unit Price"; "Value"|])
-    finalPortfolio
-    |> List.iter (fun (symbol, shares, price, value, name) ->
-        table.AddRow(
-            symbol,
-            name,
-            shares.ToString(),
-            formatPKR price,
-            formatPKR value
-        ) |> ignore)
-    AnsiConsole.Write(table)
-
-let ShowRebalanceActionsWithTax (title: string) (actions: (PortfolioPosition * int * decimal * decimal * decimal) list) (isSell: bool) (totalCommission: decimal) (totalTax: decimal) (totalValue: decimal) (cashAfter: decimal) =
-    let table =
-        Table()
-            .Title(title)
-            .AddColumns([|"Action"; "Symbol"; "Name"; "Shares"; "Price"; "Value"; "Commission"; "Tax"; "Total"|])
-    actions
-    |> List.iter (fun (pos, shares, value, commission, tax) ->
-        let action = if isSell then "Sell" else "Buy"
-        table.AddRow(
-            action,
-            pos.Symbol,
-            pos.Name,
-            shares.ToString(),
-            formatPKR pos.CurrentPrice,
-            formatPKR value,
-            formatPKR commission,
-            formatPKR tax,
-            formatPKR (if isSell then value - commission - tax else value + commission)
-        ) |> ignore)
-    AnsiConsole.Write(table)
-    if isSell then
-        AnsiConsole.MarkupLine $"[bold]Total Sell Commission:[/] {formatPKR totalCommission}"
-        AnsiConsole.MarkupLine $"[bold]Total Sell Tax:[/] {formatPKR totalTax}"
-        AnsiConsole.MarkupLine $"[bold]Total Proceeds After Commission & Tax:[/] {formatPKR totalValue}"
-        AnsiConsole.MarkupLine $"[bold]Cash After Sells:[/] {formatPKR cashAfter}"
-    else
-        AnsiConsole.MarkupLine $"[bold]Total Buy Commission:[/] {formatPKR totalCommission}"
-        AnsiConsole.MarkupLine $"[bold]Total Cost of Buys (incl. commission):[/] {formatPKR totalValue}"
-        AnsiConsole.MarkupLine $"[bold]Cash After Buys:[/] {formatPKR cashAfter}"
-
-let ShowFinalPortfolioWithNamesAndCash (finalPortfolio: (string * string * int * decimal * decimal * decimal option) list) (cashLeft: decimal) =
-    let totalValue = finalPortfolio |> List.sumBy (fun (_, _, _, _, value, _) -> value)
-    let table =
-        Table()
-            .Title("=== Final Portfolio After Rebalancing ===")
-            .AddColumns([|"Symbol"; "Name"; "Shares"; "Unit Price"; "Value"; "Current Weight %"; "Target Weight %"|])
-    finalPortfolio
-    |> List.iter (fun (symbol, name, shares, price, value, targetWeightOpt) ->
-        let currentWeight = if totalValue > 0m then (value / totalValue) * 100m else 0m
-        let targetWeight = targetWeightOpt |> Option.defaultValue 0m
-        table.AddRow(
-            symbol,
-            name,
-            shares.ToString(),
-            formatPKR price,
-            formatPKR value,
-            sprintf "%.2f%%" currentWeight,
-            sprintf "%.2f%%" (targetWeight * 100m)
-        ) |> ignore)
-    AnsiConsole.Write(table)
-    AnsiConsole.MarkupLine $"[bold]Final Cash Left:[/] {formatPKR cashLeft}"
-
-let showTransactionHistory () = async {
-    let! txnsDb = getPortfolioTransactionsAsync ()
-    let txns: PortfolioTransaction list = txnsDb |> List.map toDomain
-    let table = 
-        Table()
-            .Title("=== Transaction History ===")
-            .AddColumns("Symbol", "Type", "Shares", "Price", "Date")
-
-    txns
-    |> List.sortBy (fun t -> t.Date)
-    |> List.iter (fun t ->
-        table.AddRow(
-            t.Symbol,
-            (match t.TransactionType with TransactionType.Buy -> "BUY" | TransactionType.Sell -> "SELL"),
-            string t.Shares,
-            t.Price.ToString "F2",
-            t.Date.ToString "yyyy-MM-dd"
-        ) |> ignore)
-    AnsiConsole.Write(table)
+    let totalCost = sortedRecords |> List.sumBy (fun (_,_,_,cost,_,_) -> cost)
+    let totalValue = sortedRecords |> List.sumBy (fun (_,_,value,_,_,_) -> value)
+    let totalGainLoss = totalValue - totalCost
+    let totalGainLossPct = if totalCost <> 0m then totalGainLoss / totalCost else 0m
+    printfn "\nPortfolio Summary:"
+    printfn "  Total Invested: %s" (formatPKR totalCost)
+    printfn "  Current Value:  %s" (formatPKR totalValue)
+    printfn "  Gain/Loss:      %s" (formatPKR totalGainLoss)
+    printfn "  Gain/Loss %%:    %s" (toPercentage totalGainLossPct)
     return ()
 }
 
-let showCurrentPortfolio () = async {
-    let! txnsDb = getPortfolioTransactionsAsync ()
-    let lots =
-        txnsDb
-        |> List.groupBy (fun t -> t.Symbol)
-        |> List.map (fun (symbol, txnsDb) ->
-            let shares, avgPrice = Db.getCurrentLotsAndAvgPrice txnsDb
-            symbol, shares, avgPrice)
-    let table = 
-        Table()
-            .Title("=== Current Portfolio ===")
-            .AddColumns [|"Symbol"; "Shares"; "Avg Price"|]
-    lots
-    |> List.filter (fun (_, shares, _) -> shares > 0)
-    |> List.iter (fun (symbol, shares, avgPrice) ->
-        table.AddRow(symbol, string shares, avgPrice.ToString("F2")) |> ignore)
-    AnsiConsole.Write(table)
-    // --- Totals ---
-    let totalBuys =
-        txnsDb
-        |> List.filter (fun t -> t.TransactionType = "Buy")
-        |> List.sumBy (fun t -> decimal t.Shares * t.Price)
-    let totalSells =
-        txnsDb
-        |> List.filter (fun t -> t.TransactionType = "Sell")
-        |> List.sumBy (fun t -> decimal t.Shares * t.Price)
-    let netInvested = totalBuys - totalSells
-    AnsiConsole.MarkupLine $"[bold]Total Invested (All Buys):[/] {formatPKR totalBuys}"
-    AnsiConsole.MarkupLine $"[bold]Total Proceeds (All Sells):[/] {formatPKR totalSells}"
-    AnsiConsole.MarkupLine $"[bold]Net Invested (Buys - Sells):[/] {formatPKR netInvested}"
-    AnsiConsole.MarkupLine $"[grey]Current market value is not shown in this view. Use the main index/portfolio view for more info.[/]"
-    return ()
-}
-
-let ShowRebalanceResultWithWeights (portfolioPosition: PortfolioPosition list) (finalCash: decimal) (calcCommission: bool) =
-    let totalValue = portfolioPosition |> List.sumBy (fun p -> p.ActualValue)
+let rebalanceIndexWithCash (index: IndexTableRecord list) (prices: StockRecord list) (cash: decimal) =
+    let priceMap = prices |> List.map (fun s -> s.Symbol, s.Price) |> Map.ofList
+    let totalWeight = index |> List.sumBy (fun i -> i.Weight)
     let table =
         Table()
-            .Title("=== Rebalanced Portfolio ===")
-    if calcCommission then
-        table.AddColumns([|"Symbol"; "Name"; "Weight"; "Price"; "Shares"; "Value"; "Commission"; "Total Cost"; "Current Weight %"; "Target Weight %"|]) |> ignore
+            .Title("=== Rebalance Index With Cash ===")
+            .AddColumns [|"Symbol"; "Target Weight %"; "Price"; "Shares to Buy"; "Value"|]
+    let plan =
+        index
+        |> List.choose (fun idx ->
+            match Map.tryFind idx.Symbol priceMap with
+            | Some price when price > 0m ->
+                let targetValue = cash * (idx.Weight / totalWeight)
+                let shares = int (targetValue / price)
+                let value = decimal shares * price
+                Some (idx.Symbol, idx.Weight * 100m, price, shares, value)
+            | _ -> None)
+    let totalUsed = plan |> List.sumBy (fun (_,_,_,_,v) -> v)
+    plan |> List.iter (fun (symbol, weight, price, shares, value) ->
+        table.AddRow(symbol, sprintf "%.2f" weight, price.ToString("F2"), shares.ToString(), value.ToString("F2")) |> ignore)
+    table.AddRow("[bold]Total[/]", "", "", "", sprintf "%.2f" totalUsed) |> ignore
+    AnsiConsole.Write table
+    totalUsed
+
+let showRebalanceIndexResult (results: {| Symbol: string; Shares: int; Value: decimal; Commission: decimal; Price: decimal; Weight: decimal |} list) (includeCommission: bool) (cash: decimal) =
+    let totalValueAll = results |> List.sumBy (fun r -> r.Value)
+    let table =
+        if includeCommission then
+            Table().Title("=== Rebalance Index With Cash (With Commission) ===")
+                .AddColumns [|"Symbol"; "Index Weight"; "Current Weight"; "Price"; "Shares"; "Value"; "Commission"|]
+        else
+            Table().Title("=== Rebalance Index With Cash (No Commission) ===")
+                .AddColumns [|"Symbol"; "Index Weight"; "Current Weight"; "Price"; "Shares"; "Value"|]
+    let mutable totalValue = 0m
+    let mutable totalCommission = 0m
+    let sorted = results |> List.sortByDescending (fun r -> r.Value)
+    sorted |> List.iter (fun r ->
+        totalValue <- totalValue + r.Value
+        totalCommission <- totalCommission + r.Commission
+        let currentWeight = if totalValueAll > 0m then r.Value / totalValueAll else 0m
+        if includeCommission then
+            table.AddRow(r.Symbol, toPercentage r.Weight, toPercentage currentWeight, formatPKR r.Price, string r.Shares, formatPKR r.Value, formatPKR r.Commission) |> ignore
+        else
+            table.AddRow(r.Symbol, toPercentage r.Weight, toPercentage currentWeight, formatPKR r.Price, string r.Shares, formatPKR r.Value) |> ignore)
+    table.AddEmptyRow() |> ignore
+    if includeCommission then
+        table.AddRow("[bold]Total[/]", "", "", "", "", formatPKR totalValue, formatPKR totalCommission) |> ignore
     else
-        table.AddColumns([|"Symbol"; "Name"; "Weight"; "Price"; "Shares"; "Value"; "Current Weight %"; "Target Weight %"|]) |> ignore
-    portfolioPosition
-        |> List.sortByDescending (fun p -> p.TargetWeight)
-        |> List.iter (fun p ->
-            let currentWeight = if totalValue > 0m then (p.ActualValue / totalValue) * 100m else 0m
-            let targetWeight = p.TargetWeight * 100m
-            if calcCommission then
-                table.AddRow(
-                    p.Symbol,
-                    p.Name,
-                    toPercentage p.TargetWeight,
-                    formatPKR p.CurrentPrice,
-                    p.ActualShares.ToString(),
-                    formatPKR p.ActualValue,
-                    formatPKR p.Commission,
-                    formatPKR p.TotalCost,
-                    sprintf "%.2f%%" currentWeight,
-                    sprintf "%.2f%%" targetWeight
-                ) |> ignore
-            else
-                table.AddRow(
-                    p.Symbol,
-                    p.Name,
-                    toPercentage p.TargetWeight,
-                    formatPKR p.CurrentPrice,
-                    p.ActualShares.ToString(),
-                    formatPKR p.ActualValue,
-                    sprintf "%.2f%%" currentWeight,
-                    sprintf "%.2f%%" targetWeight
-                ) |> ignore)
-    AnsiConsole.Write(table)
-    let totalUsed = portfolioPosition |> List.sumBy (fun p -> p.TotalCost)
-    let totalCommission = portfolioPosition |> List.sumBy (fun p -> p.Commission)
-    AnsiConsole.MarkupLine $"[bold]Total Cash Used:[/] {formatPKR totalUsed}"
-    if calcCommission then
-        AnsiConsole.MarkupLine $"[bold]Total Commission:[/] {formatPKR totalCommission}"
-    AnsiConsole.MarkupLine $"[bold]Total Cash Left:[/] {formatPKR finalCash}"
+        table.AddRow("[bold]Total[/]", "", "", "", "", formatPKR totalValue) |> ignore
+    AnsiConsole.Write table
+    let spent = if includeCommission then sorted |> List.sumBy (fun r -> r.Value + r.Commission) else sorted |> List.sumBy (fun r -> r.Value)
+    let remaining = cash - spent
+    printfn "Total spent on stocks: %s" (formatPKR spent)
+    printfn "Remaining cash: %s" (formatPKR remaining)
+    if includeCommission then printfn "Total commission: %s" (formatPKR totalCommission)
+
+let showRebalanceCurrentPortfolioResult
+    (sells: {| Symbol: string; Shares: int; Price: decimal; Value: decimal; Commission: decimal |} list)
+    (buys: {| Symbol: string; Shares: int; Price: decimal; Value: decimal; Commission: decimal |} list)
+    (final: {| Symbol: string; Shares: int; Value: decimal; Commission: decimal; Price: decimal; Weight: decimal; FinalWeight: decimal |} list)
+    (includeCommission: bool)
+    (cash: decimal) =
+    let sortedSells = sells |> List.sortByDescending (fun r -> r.Value)
+    let sellTable =
+        if includeCommission then
+            Table().Title("=== Sell Orders ===")
+                .AddColumns [|"Symbol"; "Shares"; "Price"; "Value"; "Commission"|]
+        else
+            Table().Title("=== Sell Orders ===")
+                .AddColumns [|"Symbol"; "Shares"; "Price"; "Value"|]
+    sortedSells |> List.iter (fun r ->
+        if includeCommission then
+            sellTable.AddRow(r.Symbol, string r.Shares, formatPKR r.Price, formatPKR r.Value, formatPKR r.Commission) |> ignore
+        else
+            sellTable.AddRow(r.Symbol, string r.Shares, formatPKR r.Price, formatPKR r.Value) |> ignore)
+    AnsiConsole.Write sellTable
+    let totalSellValue = sortedSells |> List.sumBy (fun r -> r.Value)
+    let totalSellCommission = sortedSells |> List.sumBy (fun r -> r.Commission)
+    let cashAfterSelling = cash + totalSellValue - totalSellCommission
+    printfn "Cash after selling: %s" (formatPKR cashAfterSelling)
+    if includeCommission then printfn "Total sell commission: %s" (formatPKR totalSellCommission)
+    let sortedBuys = buys |> List.sortByDescending (fun r -> r.Value)
+    let buyTable =
+        if includeCommission then
+            Table().Title("=== Buy Orders ===")
+                .AddColumns [|"Symbol"; "Shares"; "Price"; "Value"; "Commission"|]
+        else
+            Table().Title("=== Buy Orders ===")
+                .AddColumns [|"Symbol"; "Shares"; "Price"; "Value"|]
+    sortedBuys |> List.iter (fun r ->
+        if includeCommission then
+            buyTable.AddRow(r.Symbol, string r.Shares, formatPKR r.Price, formatPKR r.Value, formatPKR r.Commission) |> ignore
+        else
+            buyTable.AddRow(r.Symbol, string r.Shares, formatPKR r.Price, formatPKR r.Value) |> ignore)
+    AnsiConsole.Write buyTable
+    let totalBuyValue = sortedBuys |> List.sumBy (fun r -> r.Value)
+    let totalBuyCommission = sortedBuys |> List.sumBy (fun r -> r.Commission)
+    let cashAfterBuying = cashAfterSelling - totalBuyValue - totalBuyCommission
+    printfn "Cash after buying: %s" (formatPKR cashAfterBuying)
+    if includeCommission then printfn "Total buy commission: %s" (formatPKR totalBuyCommission)
+    let totalValueAll = final |> List.sumBy (fun r -> r.Value)
+    let finalTable =
+        if includeCommission then
+            Table().Title("=== Final Portfolio After Rebalance ===")
+                .AddColumns [|"Symbol"; "Index Weight"; "Current Weight"; "Price"; "Shares"; "Value"; "Commission"|]
+        else
+            Table().Title("=== Final Portfolio After Rebalance ===")
+                .AddColumns [|"Symbol"; "Index Weight"; "Current Weight"; "Price"; "Shares"; "Value"|]
+    let mutable totalValue = 0m
+    let mutable totalCommission = 0m
+    let sortedFinal = final |> List.sortByDescending (fun r -> r.Value)
+    sortedFinal |> List.iter (fun r ->
+        totalValue <- totalValue + r.Value
+        totalCommission <- totalCommission + r.Commission
+        if includeCommission then
+            finalTable.AddRow(r.Symbol, toPercentage r.Weight, toPercentage r.FinalWeight, formatPKR r.Price, string r.Shares, formatPKR r.Value, formatPKR r.Commission) |> ignore
+        else
+            finalTable.AddRow(r.Symbol, toPercentage r.Weight, toPercentage r.FinalWeight, formatPKR r.Price, string r.Shares, formatPKR r.Value) |> ignore)
+    finalTable.AddEmptyRow() |> ignore
+    if includeCommission then
+        finalTable.AddRow("[bold]Total[/]", "", "", "", "", formatPKR totalValue, formatPKR totalCommission) |> ignore
+    else
+        finalTable.AddRow("[bold]Total[/]", "", "", "", "", formatPKR totalValue) |> ignore
+    AnsiConsole.Write finalTable
+    let spent = if includeCommission then sortedFinal |> List.sumBy (fun r -> r.Value + r.Commission) else sortedFinal |> List.sumBy (fun r -> r.Value)
+    let remaining = cashAfterBuying
+    printfn "Total spent on stocks: %s" (formatPKR spent)
+    printfn "Remaining cash: %s" (formatPKR remaining)
+    if includeCommission then printfn "Total commission: %s" (formatPKR totalCommission)

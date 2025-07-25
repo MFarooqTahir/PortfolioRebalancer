@@ -6,4 +6,9 @@ alwaysApply: true
 - Make sure to look at the project file to see the f sharp version and use the latest features.
 - Do not make mistakes or linting errors, make sure code is readable and has no linting errors. 
 - Never use comments.
-- Never remove functionality or logic unless specifically asked to
+- Never remove functionality or logic unless specifically asked to.
+- Always remove redundant code and redundant qualifiers when not needed.
+- Never keep unnecesary paranthesis.
+- Dont make mistakes with indentation.
+- Plase use functions in the helpers fle where ever possible.
+- Never use boxing
