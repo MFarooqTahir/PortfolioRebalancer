@@ -25,16 +25,6 @@ type Logger() =
     member _.Warning message = logToFile Warning message
     member _.Error message = logToFile Error message
     
-    member this.LogRebalanceStart cash includeCommission =
-        this.Info (sprintf "Starting rebalancing with cash: %M, commission: %b" cash includeCommission)
-    
-    member this.LogRebalanceComplete totalValue totalCommission =
-        this.Info (sprintf "Rebalancing completed. Total value: %M, Total commission: %M" totalValue totalCommission)
-    
-    member this.LogValidationError error =
-        this.Warning (sprintf "Validation error: %A" error)
-    
-    member this.LogMissingSymbols symbols =
-        this.Warning (sprintf "Missing price data for symbols: %s" (String.concat ", " symbols))
+
 
 let logger = Logger() 

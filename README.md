@@ -12,7 +12,7 @@ A comprehensive F# application for portfolio rebalancing with support for index-
 - **⚡ Performance Monitoring**: Built-in performance tracking and caching
 - **📝 Comprehensive Logging**: Detailed logging for debugging and monitoring
 - **🛡️ Type Safety**: Full F# type safety with discriminated unions and Result types
-- **🧪 Comprehensive Testing**: 50 unit tests covering validation, business logic, and utilities with beautiful Spectre.Console output
+- **🧪 Comprehensive Testing**: 35 unit tests covering validation, business logic, and utilities
 - **⚙️ Configuration Management**: Centralized application settings
 - **🔍 Input Validation**: Robust validation with custom error types
 
@@ -118,7 +118,7 @@ docker ps -a | grep portfolio-postgres
 
 ## 🧪 Testing
 
-The project includes a comprehensive test suite with **50 tests** covering all major functionality, featuring beautiful Spectre.Console output:
+The project includes a comprehensive test suite with **35 tests** covering all major functionality, featuring beautiful enhanced output using Spectre.Console:
 
 ### Test Coverage
 
@@ -126,48 +126,31 @@ The project includes a comprehensive test suite with **50 tests** covering all m
 |----------|-------|-------------|
 | **Validation** | 15 | Input validation, error handling, and data integrity |
 | **Helper Functions** | 5 | Utility functions and calculations |
-| **Extensions** | 12 | Type extensions and utility methods |
 | **Rebalancing Calculations** | 8 | Core rebalancing logic and edge cases |
 | **Configuration** | 3 | Application settings and constants |
-| **Messages** | 3 | User-facing messages and formatting |
+| **Messages** | 2 | User-facing messages and formatting |
 
-**Total: 50 tests** covering all critical business logic and edge cases.
+**Total: 35 tests** covering all critical business logic and edge cases.
 
-### Beautiful Test Output
+### 🧪 Testing
 
-The test suite now features enhanced output using Spectre.Console:
+The test suite provides comprehensive coverage of all critical functionality:
 
-- **Color-coded results** with green for passed tests and red for failures
-- **Structured tables** showing test categories and results
-- **Professional formatting** with rounded borders and proper spacing
-- **Clear summaries** with pass/fail counts and execution time
-
-### Running Tests
-
-#### Basic Test Execution
 ```bash
 # Run all tests
 dotnet test
 
 # Run tests with detailed output
-dotnet test --logger "console;verbosity=detailed"
-
-# Run tests with normal verbosity
-dotnet test --verbosity normal
+dotnet test --verbosity detailed
 
 # Run specific test project
 dotnet test PortfolioRebalancer.Tests/
+
+# Run tests with normal verbosity
+dotnet test --verbosity normal
 ```
 
-#### Test Output Example
-```
-Test Run Successful.
-Total tests: 50
-     Passed: 50
- Total time: 1.9085 Seconds
 
-Test summary: total: 50, failed: 0, succeeded: 50, skipped: 0, duration: 2.0s
-```
 
 ### Test Categories
 
@@ -293,7 +276,7 @@ Log files are stored in the application directory with timestamps and rotation.
 
 ## 🧪 Testing
 
-The application includes a comprehensive test suite with **46 tests** covering all major functionality:
+The application includes a comprehensive test suite with **35 tests** covering all major functionality. For detailed information about the enhanced test output system, see the [Testing section](#-testing) above.
 
 ### Test Coverage
 
@@ -301,43 +284,24 @@ The application includes a comprehensive test suite with **46 tests** covering a
 |----------|-------|----------|
 | **Validation** | 15 | Input validation, error handling |
 | **Helper Functions** | 5 | Commission, formatting, utilities |
-| **Extensions** | 12 | List, Map, Decimal, Int extensions |
 | **Rebalancing Calculations** | 8 | Core business logic, algorithms |
 | **Configuration** | 3 | Settings and constants validation |
-| **Messages** | 3 | User interface messages |
+| **Messages** | 2 | User interface messages |
 
-### Running Tests
+### Quick Test Commands
 
-#### Quick Test Run
 ```bash
-# Run all tests
-dotnet test
+# Run tests with enhanced output (recommended)
+dotnet run --project TestRunner/
 
-# Run with detailed output
+# Run standard tests
 dotnet test --logger "console;verbosity=detailed"
 
 # Run specific test project
 dotnet test PortfolioRebalancer.Tests/
 ```
 
-#### Test Output Example
-```
-Starting test execution, please wait...
-A total of 1 test files matched the specified pattern.
-
-[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.8.0.0 (64-bit .NET 9.0.0)
-[xUnit.net 00:00:00.00]   Discovering: PortfolioRebalancer.Tests
-[xUnit.net 00:00:00.00]   Discovered:  PortfolioRebalancer.Tests
-[xUnit.net 00:00:00.00]   Starting:    PortfolioRebalancer.Tests
-[xUnit.net 00:00:00.00]   Finished:    PortfolioRebalancer.Tests
-
-Test Run Successful.
-Total tests: 46
-     Passed: 46
- Total time: 1.2345 Seconds
-```
-
-#### Test Categories
+### Test Categories
 
 **Validation Tests (15 tests)**
 - `validateCashAmount` - Positive, zero, and negative amounts
@@ -351,12 +315,6 @@ Total tests: 46
 - `createWeightMap` - Weight map creation from index data
 - `formatPKR`, `toPercentage`, `formatPKRShort` - Formatting functions
 
-**Extensions Tests (12 tests)**
-- **ListExtensions**: `tryHead`, `tryLast` for safe list operations
-- **MapExtensions**: `tryFindOrDefault` for safe map access
-- **DecimalExtensions**: `toPercentage`, `isPositive`, `isNegative`, `isZero`
-- **IntExtensions**: `toDecimal`, `isPositive`, `isNegative`, `isZero`
-
 **Rebalancing Calculation Tests (8 tests)**
 - `createPriceMap`, `createCurrentSharesMap` - Data structure creation
 - `calculateTargetShares` - Target share calculation logic
@@ -369,19 +327,8 @@ Total tests: 46
 - Database settings validation
 - Validation rules validation
 
-**Messages Tests (3 tests)**
+**Messages Tests (2 tests)**
 - Error, success, and info message validation
-
-### Test Configuration
-
-The test project uses xUnit with detailed logging enabled:
-
-```xml
-<PropertyGroup>
-    <VSTestLogger>console</VSTestLogger>
-    <VSTestVerbosity>detailed</VSTestVerbosity>
-</PropertyGroup>
-```
 
 ## 🔧 Development Workflow
 
@@ -400,6 +347,11 @@ The test project uses xUnit with detailed logging enabled:
 2. **Build and Test:**
    ```bash
    dotnet build
+   
+   # Run tests
+   dotnet test
+   
+   # Or run standard tests
    dotnet test --logger "console;verbosity=detailed"
    ```
 
@@ -414,6 +366,9 @@ The test project uses xUnit with detailed logging enabled:
 # Clean and rebuild
 dotnet clean
 dotnet build
+
+# Run tests
+dotnet test
 
 # Run tests with detailed logging
 dotnet test --logger "console;verbosity=detailed"
@@ -453,7 +408,7 @@ PortfolioRebalancer/
 │   ├── Extensions.fs              # Extension methods
 │   └── Messages.fs                # User messages
 ├── PortfolioRebalancer.Tests/     # Test project
-│   ├── Tests.fs                   # Comprehensive test suite (50 tests)
+│   ├── Tests.fs                   # Comprehensive test suite (35 tests)
 │   └── PortfolioRebalancer.Tests.fsproj # Test project configuration
 ├── PortfolioRebalancer.sln        # Solution file
 └── Portfolio Data/                # Sample data
@@ -533,6 +488,7 @@ This project is licensed under the MIT License.
 - **Selenium** - Web scraping and automation
 - **xUnit** - Comprehensive testing framework
 - **Dapper** - Lightweight ORM for database access
+
 
 ## 📞 Support
 

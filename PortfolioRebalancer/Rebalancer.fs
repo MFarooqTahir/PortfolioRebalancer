@@ -6,58 +6,7 @@ open Table
 open RebalancingCalculations
 open Spectre.Console
 
-// Legacy functions for backward compatibility
-let rebalanceIndexWithCash (index: IndexTableRecord list) (prices: StockRecord list) (cash: decimal) =
-    let config = { 
-        IncludeCommission = true
-        Cash = cash
-        Index = index
-        Current = []
-        Prices = prices
-    }
-    rebalanceIndex config
-    |> Result.map (fun result -> result.Orders)
-    |> Result.defaultValue []
 
-let rebalanceCurrentPortfolioWithCash (index: IndexTableRecord list) (current: CurrentPortfolio list) (prices: StockRecord list) (cash: decimal) =
-    let config = { 
-        IncludeCommission = true
-        Cash = cash
-        Index = index
-        Current = current
-        Prices = prices
-    }
-    rebalanceCurrentPortfolio config
-    |> Result.map (fun result -> result.Buys)
-    |> Result.defaultValue []
-
-let getRebalanceIndexPlan (index: IndexTableRecord list) (prices: StockRecord list) (cash: decimal) =
-    let config = { 
-        IncludeCommission = false
-        Cash = cash
-        Index = index
-        Current = []
-        Prices = prices
-    }
-    rebalanceIndex config
-    |> Result.map (fun result -> 
-        result.Orders 
-        |> List.map (fun order -> (order.Symbol, 0m, order.Price, order.Shares, order.Value)))
-    |> Result.defaultValue []
-
-let getRebalanceCurrentPortfolioPlan (index: IndexTableRecord list) (current: CurrentPortfolio list) (prices: StockRecord list) (cash: decimal) =
-    let config = { 
-        IncludeCommission = false
-        Cash = cash
-        Index = index
-        Current = current
-        Prices = prices
-    }
-    rebalanceCurrentPortfolio config
-    |> Result.map (fun result -> 
-        result.Buys 
-        |> List.map (fun order -> (order.Symbol, 0m, order.Price, 0, order.Shares, order.Value)))
-    |> Result.defaultValue []
 
 // Main rebalancing function with improved structure
 let rebalanceAndDisplay 

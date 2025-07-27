@@ -21,23 +21,8 @@ type ValidationError =
     | InvalidPrice of decimal
     | InvalidShares of int
 
-type DatabaseError =
-    | ConnectionError of string
-    | QueryError of string
-    | DataError of string
-    | TransactionError of string
-
-type ApplicationError =
-    | Validation of ValidationError
-    | Scraping of ScrapingError
-    | Database of DatabaseError
-    | Configuration of string
-    | Unexpected of string
-
 // Enhanced result types for better error handling
-type OperationResult<'T> = Result<'T, ApplicationError>
 type ValidationResult<'T> = Result<'T, ValidationError>
-type DatabaseResult<'T> = Result<'T, DatabaseError>
 
 [<CLIMutable>]
 type IndexTableRecord = {
@@ -62,10 +47,13 @@ type IndexType =
     | KSE30
     | KSE100
 
-type RebalanceAction = 
-| Buy of Symbol: string * UnitPrice: decimal * Shares: int * Value: decimal * Commission: decimal
-| Sell of Symbol: string * UnitPrice: decimal * Shares: int * Value: decimal * Commission: decimal
-| Hold of Symbol: string * UnitPrice: decimal * Shares: int * Value: decimal
+// Type for scraped index data
+type ScrapedIndexData = {
+    Symbol: string
+    Weight: decimal
+    Price: decimal
+    Name: string
+}
 
 // New types for better structure
 type RebalanceOrder = {

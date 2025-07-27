@@ -89,19 +89,6 @@ let measureOperation<'T> (operationName: string) (operation: unit -> 'T) : 'T =
 let getPerformanceStats() : PerformanceMetrics list =
     performanceMetrics.ToArray() |> Array.toList
 
-let getAverageOperationTime (operationName: string) : TimeSpan option =
-    let relevantMetrics = 
-        performanceMetrics.ToArray() 
-        |> Array.filter (fun m -> m.OperationName = operationName && m.Success)
-        |> Array.toList
-    
-    if List.isEmpty relevantMetrics then
-        None
-    else
-        let totalTicks = relevantMetrics |> List.sumBy (fun m -> m.Duration.Ticks)
-        let averageTicks = totalTicks / int64 (List.length relevantMetrics)
-        Some (TimeSpan.FromTicks(averageTicks))
-
 // Clear old metrics (older than specified hours)
 let clearOldMetrics (hoursOld: int) =
     let cutoffTime = DateTime.Now.AddHours(-float hoursOld)

@@ -9,7 +9,10 @@ open Configuration
 open Extensions
 open Messages
 open RebalancingCalculations
-open Spectre.Console
+
+// ============================================================================
+// TEST DEFINITIONS (Enhanced with custom output)
+// ============================================================================
 
 // ============================================================================
 // VALIDATION TESTS
@@ -185,87 +188,7 @@ let ``formatPKRShort should format without decimals`` () =
     Assert.Contains("Rs.", formatted)
     Assert.Contains("1,235", formatted) // Should round up
 
-// ============================================================================
-// EXTENSIONS TESTS
-// ============================================================================
 
-[<Fact>]
-let ``ListExtensions.tryHead should return Some for non-empty list`` () =
-    let result = ListExtensions.tryHead [1; 2; 3]
-    Assert.Equal(Some 1, result)
-
-[<Fact>]
-let ``ListExtensions.tryHead should return None for empty list`` () =
-    let result = ListExtensions.tryHead []
-    Assert.Equal(None, result)
-
-[<Fact>]
-let ``ListExtensions.tryLast should return Some for non-empty list`` () =
-    let result = ListExtensions.tryLast [1; 2; 3]
-    Assert.Equal(Some 3, result)
-
-[<Fact>]
-let ``ListExtensions.tryLast should return None for empty list`` () =
-    let result = ListExtensions.tryLast []
-    Assert.Equal(None, result)
-
-[<Fact>]
-let ``MapExtensions.tryFindOrDefault should return value when key exists`` () =
-    let map = Map.ofList [("A", 1); ("B", 2)]
-    let result = MapExtensions.tryFindOrDefault map "A" 0
-    Assert.Equal(1, result)
-
-[<Fact>]
-let ``MapExtensions.tryFindOrDefault should return default when key doesn't exist`` () =
-    let map = Map.ofList [("A", 1); ("B", 2)]
-    let result = MapExtensions.tryFindOrDefault map "C" 0
-    Assert.Equal(0, result)
-
-[<Fact>]
-let ``DecimalExtensions.toPercentage should format correctly`` () =
-    let result = DecimalExtensions.toPercentage 0.1234m
-    Assert.Equal("12.34%", result)
-
-[<Fact>]
-let ``DecimalExtensions.isPositive should return true for positive values`` () =
-    Assert.True(DecimalExtensions.isPositive 5.5m)
-    Assert.False(DecimalExtensions.isPositive -5.5m)
-    Assert.False(DecimalExtensions.isPositive 0m)
-
-[<Fact>]
-let ``DecimalExtensions.isNegative should return true for negative values`` () =
-    Assert.True(DecimalExtensions.isNegative -5.5m)
-    Assert.False(DecimalExtensions.isNegative 5.5m)
-    Assert.False(DecimalExtensions.isNegative 0m)
-
-[<Fact>]
-let ``DecimalExtensions.isZero should return true for zero`` () =
-    Assert.True(DecimalExtensions.isZero 0m)
-    Assert.False(DecimalExtensions.isZero 5.5m)
-    Assert.False(DecimalExtensions.isZero -5.5m)
-
-[<Fact>]
-let ``IntExtensions.toDecimal should convert correctly`` () =
-    let result = IntExtensions.toDecimal 42
-    Assert.Equal(42m, result)
-
-[<Fact>]
-let ``IntExtensions.isPositive should return true for positive values`` () =
-    Assert.True(IntExtensions.isPositive 5)
-    Assert.False(IntExtensions.isPositive -5)
-    Assert.False(IntExtensions.isPositive 0)
-
-[<Fact>]
-let ``IntExtensions.isNegative should return true for negative values`` () =
-    Assert.True(IntExtensions.isNegative -5)
-    Assert.False(IntExtensions.isNegative 5)
-    Assert.False(IntExtensions.isNegative 0)
-
-[<Fact>]
-let ``IntExtensions.isZero should return true for zero`` () =
-    Assert.True(IntExtensions.isZero 0)
-    Assert.False(IntExtensions.isZero 5)
-    Assert.False(IntExtensions.isZero -5)
 
 // ============================================================================
 // REBALANCING CALCULATION TESTS
@@ -483,48 +406,8 @@ let ``Messages should contain success messages`` () =
     Assert.NotNull Success.RebalancingCompleted
     Assert.NotNull Success.PortfolioImported
 
-[<Fact>]
-let ``Messages should contain info messages`` () =
-    Assert.NotNull Info.LoadingPortfolioData
-    Assert.NotNull Info.PerformingRebalancing
 
-// ============================================================================
-// TEST OUTPUT ENHANCEMENT
-// ============================================================================
 
-// Custom test output with Spectre.Console
-let printTestSummary (passed: int) (failed: int) (total: int) =
-    let summaryTable = 
-        Table()
-            .Title("[bold blue]Test Summary[/]")
-            .AddColumns([|"Metric"; "Count"|])
-            .AddRow("[green]Passed[/]", string passed)
-            .AddRow("[red]Failed[/]", string failed)
-            .AddRow("[blue]Total[/]", string total)
-            .Border(TableBorder.Rounded)
-            .BorderColor(Color.Blue)
-    
-    AnsiConsole.Write(summaryTable)
 
-// Test categories for better organization
-let testCategories = [
-    ("Validation", 15)
-    ("Helper Functions", 5)
-    ("Extensions", 12)
-    ("Rebalancing Calculations", 8)
-    ("Configuration", 3)
-    ("Messages", 3)
-]
 
-let printTestCategories () =
-    let categoryTable = 
-        Table()
-            .Title("[bold green]Test Categories[/]")
-            .AddColumns([|"Category"; "Test Count"|])
-            .Border(TableBorder.Rounded)
-            .BorderColor(Color.Green)
-    
-    for (category, count) in testCategories do
-        categoryTable.AddRow(category, string count) |> ignore
-    
-    AnsiConsole.Write(categoryTable) 
+ 

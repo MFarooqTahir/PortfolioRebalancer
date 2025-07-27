@@ -5,15 +5,11 @@ open Dapper
 open Types
 open Dapper.FSharp.PostgreSQL
 open Configuration
-open Validation
 open Logging
 
 OptionTypes.register()
 
-type DatabaseError =
-    | ConnectionError of string
-    | QueryError of string
-    | DataError of string
+
 
 let private getConnection() = 
     try

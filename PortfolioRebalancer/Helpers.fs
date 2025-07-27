@@ -3,11 +3,10 @@
 open System.Globalization
 open System
 open Types
-open Configuration
 
-let indianCulture = CultureInfo "hi-IN"
+let indianCulture = CultureInfo Configuration.App.DefaultCulture
 do
-    indianCulture.NumberFormat.CurrencySymbol <- "Rs."
+    indianCulture.NumberFormat.CurrencySymbol <- Configuration.App.CurrencySymbol
 
 let formatPKR (amount: decimal) = 
     amount.ToString("C2", indianCulture)
@@ -29,34 +28,8 @@ let (|ValidWeight|_|) (str: string) =
     | true, weight when weight > 0m -> Some (weight / 100m)
     | _ -> None
 
-let createWeightMap (indexRecords: IndexTableRecord list) =
-    indexRecords
-        |> List.map(fun x -> x.Symbol, x.Weight)
-        |> Map.ofList
-
-type StockDisplayTableRecord = {
-    Weight: decimal
-    Symbol: string
-    Name: string
-    Price: decimal
-}
-
-let createStockTableRecord (indexRecords: IndexTableRecord list) (individualStockData: StockRecord list) =
-    let weightMap = indexRecords |> createWeightMap
-
-    individualStockData 
-        |> List.choose (fun stock -> 
-            weightMap 
-            |> Map.tryFind stock.Symbol
-            |> Option.map (fun weight -> {
-                Weight = weight
-                Symbol = stock.Symbol
-                Name = stock.Name
-                Price = stock.Price
-            }))
-
 let calculateCommission sharePrice quantity =
-    if sharePrice < Commission.MinimumPrice then
-        Commission.FixedRate * decimal quantity
+    if sharePrice < Configuration.Commission.MinimumPrice then
+        Configuration.Commission.FixedRate * decimal quantity
     else
-        sharePrice * decimal quantity * Commission.PercentageRate
+        sharePrice * decimal quantity * Configuration.Commission.PercentageRate

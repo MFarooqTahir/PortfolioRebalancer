@@ -182,7 +182,7 @@ let private GetMissingStockPricesAsync (driver: IWebDriver) (missingSymbols: str
         let! priceResult = GetStockFromPSXAsync driver symbol
         match priceResult with
         | Ok (price, name)->
-            let stockRow = {
+            let stockRow : StockRecord = {
                 Symbol = symbol
                 Name = name
                 Price = price
@@ -201,7 +201,8 @@ let updateStockRecordsForSymbols (symbols: string list) = async {
         let! result = GetStockFromPSXAsync driver symbol
         match result with
         | Ok (price, name) ->
-            stockRecords <- { Symbol = symbol; Name = name; Price = price } :: stockRecords
+            let stockRecord : StockRecord = { Symbol = symbol; Name = name; Price = price }
+            stockRecords <- stockRecord :: stockRecords
         | Error _ -> ()
     if not (List.isEmpty stockRecords) then
         let! existingStocks = Db.getStockRecordsAsync ()
@@ -258,7 +259,7 @@ let ConstructIndexCache getLatestStockPrices indexType = async {
                                 Symbol = x.Symbol
                                 Price = x.Price
                                 Name = x.Name
-                            })
+                            } : StockRecord)
                         |> List.append kseSymbols
                         |> List.distinctBy _.Symbol
                 let mergedData = 
