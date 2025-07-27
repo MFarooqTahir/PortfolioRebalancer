@@ -4,6 +4,7 @@ open System.IO
 open System.Text.Json
 open Types
 open Db
+open System
 
 let options = JsonSerializerOptions()
 do
@@ -38,7 +39,7 @@ let importCurrentPortfolioFromJson (filePath: string) = async {
                 printfn "Please ensure the JSON contains at least one portfolio entry."
                 return ()
             
-            // Validate each record
+            // Validate each record and filter out ETFs
             let validationErrors = 
                 xs |> List.mapi (fun index record ->
                     let errors = ResizeArray<string>()
@@ -55,17 +56,38 @@ let importCurrentPortfolioFromJson (filePath: string) = async {
                     errors |> Seq.toList
                 ) |> List.concat
             
+            // Filter out ETFs (symbols ending with common ETF suffixes)
+            let isETF (symbol:string) =
+                symbol.EndsWith("ETF", StringComparison.OrdinalIgnoreCase) || 
+                symbol.EndsWith("ETN", StringComparison.OrdinalIgnoreCase) || 
+                symbol.EndsWith("ETP", StringComparison.OrdinalIgnoreCase) ||
+                symbol.EndsWith("FUND", StringComparison.OrdinalIgnoreCase) ||
+                symbol.EndsWith("TRUST", StringComparison.OrdinalIgnoreCase)
+            
+            let etfs, stocks = xs |> List.partition (fun record -> isETF record.Symbol)
+            
+            if not (List.isEmpty etfs) then
+                printfn "[INFO] ETFs detected and will be excluded from import:"
+                etfs |> List.iter (fun etf -> printfn "  - %s (ETF)" etf.Symbol)
+                printfn ""
+            
+            if List.isEmpty stocks then
+                printfn "[ERROR] No valid stocks found after filtering ETFs."
+                printfn "Please ensure your portfolio contains individual stocks, not just ETFs."
+                return ()
+            
             if not (List.isEmpty validationErrors) then
                 printfn "[ERROR] Validation errors found:"
                 validationErrors |> List.iter (printfn "  - %s")
                 return ()
             
-            // Import to database
-            do! setCurrentPortfolioAsync xs
+            // Import to database (only stocks, not ETFs)
+            do! setCurrentPortfolioAsync stocks
             printfn "[SUCCESS] Current portfolio imported and saved to database."
             printfn "  - File: %s" filePath
-            printfn "  - Records: %d" xs.Length
-            printfn "  - Total value: %M" (xs |> List.sumBy (fun r -> decimal r.Shares * r.Price))
+            printfn "  - Stocks imported: %d" stocks.Length
+            printfn "  - ETFs excluded: %d" etfs.Length
+            printfn "  - Total value: %M" (stocks |> List.sumBy (fun r -> decimal r.Shares * r.Price))
             
     with 
     | :? DirectoryNotFoundException as ex ->

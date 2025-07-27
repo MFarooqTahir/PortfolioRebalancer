@@ -342,6 +342,14 @@ dotnet --info
 
 The Portfolio Rebalancer supports importing current portfolio data from JSON files. This allows you to work with your actual portfolio holdings for rebalancing calculations.
 
+> 📖 **For detailed import instructions, see [IMPORT_GUIDE.md](IMPORT_GUIDE.md)**
+
+### Important Notes
+
+- **ETF Filtering**: The importer automatically excludes ETFs from your portfolio
+- **Supported Securities**: Only individual stocks are imported (no ETFs, bonds, or other securities)
+- **File Format**: JSON format with specific structure requirements
+
 ### Import Process
 
 #### 1. **Prepare Your Portfolio Data**

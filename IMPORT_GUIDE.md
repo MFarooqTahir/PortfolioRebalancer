@@ -27,6 +27,21 @@ Your portfolio JSON file must be an array of objects with exactly these fields:
 ]
 ```
 
+### ⚠️ Important: ETF Filtering
+
+**The importer automatically excludes ETFs from your portfolio.** Only individual stocks will be imported.
+
+**Excluded Securities:**
+- ETFs (symbols ending with ETF, ETN, ETP, FUND, TRUST)
+- Bonds, mutual funds, and other non-stock securities
+- Any security with ETF-like naming patterns
+
+**Example:**
+- ✅ `AAPL` - Will be imported (individual stock)
+- ❌ `SPY` - Will be excluded (ETF)
+- ❌ `VTI` - Will be excluded (ETF)
+- ❌ `QQQETF` - Will be excluded (ETF)
+
 ### Field Specifications
 
 **Symbol** (string) - ✅ Required
@@ -120,9 +135,14 @@ Your portfolio JSON file must be an array of objects with exactly these fields:
 
 4. **Wait for confirmation:**
    ```
+   [INFO] ETFs detected and will be excluded from import:
+     - SPY (ETF)
+     - VTI (ETF)
+   
    [SUCCESS] Current portfolio imported and saved to database.
      - File: C:\Users\YourName\Documents\portfolio.json
-     - Records: 6
+     - Stocks imported: 4
+     - ETFs excluded: 2
      - Total value: 125000.50
    ```
 
@@ -183,6 +203,15 @@ Please check the JSON format and ensure it matches the required structure.
 - Remove any text formatting or currency symbols
 - Check for negative values or zero values
 
+### ETF Exclusion
+```
+[INFO] ETFs detected and will be excluded from import:
+  - SPY (ETF)
+  - VTI (ETF)
+```
+
+**Note:** This is informational only. ETFs are automatically filtered out during import.
+
 ## 🛠️ Data Validation
 
 The import process validates:
@@ -193,6 +222,7 @@ The import process validates:
 - ✅ **Required Fields**: Verifies all required fields are present
 - ✅ **Data Types**: Ensures correct types for each field
 - ✅ **Business Rules**: Validates shares > 0, prices > 0, non-empty symbols
+- ✅ **ETF Filtering**: Automatically excludes ETFs and non-stock securities
 - ✅ **Database Storage**: Successfully saves to PostgreSQL
 - ✅ **Cache Invalidation**: Clears old portfolio cache
 
@@ -266,6 +296,7 @@ done
 2. **Verify share counts** - Ensure accuracy of holdings
 3. **Consistent symbols** - Use same symbols as index data
 4. **Backup original** - Keep copy of source data
+5. **Separate ETFs** - ETFs will be automatically excluded, so focus on individual stocks
 
 ### File Management
 1. **File paths** - Use absolute paths for reliability
@@ -320,6 +351,8 @@ After successful import:
 - [ ] Shares are positive whole numbers
 - [ ] File is not empty
 - [ ] File encoding is UTF-8
+- [ ] Portfolio contains individual stocks (not just ETFs)
+- [ ] ETF exclusion is expected behavior
 
 ## 📞 Support
 
