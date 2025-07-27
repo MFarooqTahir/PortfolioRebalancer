@@ -354,7 +354,7 @@ The Portfolio Rebalancer supports importing current portfolio data from JSON fil
 
 #### 1. **Prepare Your Portfolio Data**
 
-Create a JSON file with your current portfolio holdings. The file should be named `CurrentPortfolio.json` and placed in the application's working directory.
+Create a JSON file with your current portfolio holdings. You can name it anything you want and place it anywhere on your system.
 
 #### 2. **JSON Format**
 
@@ -417,20 +417,14 @@ Your portfolio JSON file must follow this exact structure:
 
 ### Sample Data
 
-The application includes sample data in the `Portfolio Data/` directory:
+The application includes sample data for testing. You can create your own portfolio JSON file following the format shown in the examples above.
 
-- `CurrentPortfolio.json` - Sample portfolio for testing
-- `periodic-details.pdf` - Documentation
-
-#### Using Sample Data
+#### Creating Sample Data
 
 ```bash
-# Copy sample portfolio to working directory
-cp "Portfolio Data/CurrentPortfolio.json" .
-
-# Run application and import
-dotnet run --project PortfolioRebalancer/
-# Choose Option 2 to import
+# Create a sample portfolio file
+# Use the JSON format shown in the examples above
+# Then run the application and import using Option 2
 ```
 
 ### Import Validation
@@ -894,9 +888,7 @@ PortfolioRebalancer/
 │   ├── Tests.fs                   # Comprehensive test suite (35 tests)
 │   └── PortfolioRebalancer.Tests.fsproj # Test project configuration
 ├── PortfolioRebalancer.sln        # Solution file
-└── Portfolio Data/                # Sample data
-    ├── CurrentPortfolio.json      # Sample portfolio
-    └── periodic-details.pdf       # Documentation
+└── PortfolioRebalancer.Tests/     # Unit tests
 ```
 
 ## 🤝 Contributing

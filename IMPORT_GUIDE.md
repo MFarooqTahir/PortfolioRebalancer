@@ -7,7 +7,7 @@ This guide provides comprehensive instructions for importing your current portfo
 ## 🎯 Quick Start
 
 1. **Prepare your portfolio JSON file**
-2. **Place it in the application directory as `CurrentPortfolio.json`**
+2. **Place it anywhere on your system (you'll provide the path)**
 3. **Run the application and choose Option 2**
 4. **Verify the import with Option 1**
 
@@ -228,20 +228,18 @@ The import process validates:
 
 ## 📊 Sample Data Usage
 
-### Using Included Sample
+### Creating Sample Data
 
 ```bash
-# Run the application
-dotnet run --project PortfolioRebalancer/
-
-# Choose Option 2 and enter the path to the sample file:
-# Portfolio Data/CurrentPortfolio.json
+# Create a sample portfolio file using the format shown above
+# Example: sample-portfolio.json
+# Then run the application and import using Option 2
 ```
 
-### Sample Portfolio Contents
+### Sample Portfolio Example
 
-The included sample contains:
-- **6 stocks** from Pakistani market
+Here's an example of what your portfolio JSON should look like:
+- **Individual stocks** (not ETFs)
 - **Realistic share counts** and prices
 - **Proper JSON formatting**
 
@@ -284,8 +282,8 @@ echo "Then enter the path: $PORTFOLIO_FILE"
 # Process multiple portfolio files
 for file in portfolios/*.json; do
     echo "Processing $file..."
-    cp "$file" CurrentPortfolio.json
-    # Run import process
+    echo "Note: Manual import required for each file"
+    echo "Run the application and choose Option 2, then enter: $file"
 done
 ```
 
