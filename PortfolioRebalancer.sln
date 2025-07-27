@@ -1,25 +1,48 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36301.6 d17.14
+VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "PortfolioRebalancer", "PortfolioRebalancer\PortfolioRebalancer.fsproj", "{E76ED399-AAF3-4DB3-9688-9CE812CA7886}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "PortfolioRebalancer", "PortfolioRebalancer\PortfolioRebalancer.fsproj", "{C1E76DBF-CEFA-455D-82A0-A110D90A75F1}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "PortfolioRebalancer.Tests", "PortfolioRebalancer.Tests\PortfolioRebalancer.Tests.fsproj", "{D22B6610-CF84-429C-92EF-3021CECB557E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
 		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{E76ED399-AAF3-4DB3-9688-9CE812CA7886}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{E76ED399-AAF3-4DB3-9688-9CE812CA7886}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{E76ED399-AAF3-4DB3-9688-9CE812CA7886}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{E76ED399-AAF3-4DB3-9688-9CE812CA7886}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C1E76DBF-CEFA-455D-82A0-A110D90A75F1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C1E76DBF-CEFA-455D-82A0-A110D90A75F1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C1E76DBF-CEFA-455D-82A0-A110D90A75F1}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{C1E76DBF-CEFA-455D-82A0-A110D90A75F1}.Debug|x64.Build.0 = Debug|Any CPU
+		{C1E76DBF-CEFA-455D-82A0-A110D90A75F1}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{C1E76DBF-CEFA-455D-82A0-A110D90A75F1}.Debug|x86.Build.0 = Debug|Any CPU
+		{C1E76DBF-CEFA-455D-82A0-A110D90A75F1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C1E76DBF-CEFA-455D-82A0-A110D90A75F1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C1E76DBF-CEFA-455D-82A0-A110D90A75F1}.Release|x64.ActiveCfg = Release|Any CPU
+		{C1E76DBF-CEFA-455D-82A0-A110D90A75F1}.Release|x64.Build.0 = Release|Any CPU
+		{C1E76DBF-CEFA-455D-82A0-A110D90A75F1}.Release|x86.ActiveCfg = Release|Any CPU
+		{C1E76DBF-CEFA-455D-82A0-A110D90A75F1}.Release|x86.Build.0 = Release|Any CPU
+		{D22B6610-CF84-429C-92EF-3021CECB557E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D22B6610-CF84-429C-92EF-3021CECB557E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D22B6610-CF84-429C-92EF-3021CECB557E}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{D22B6610-CF84-429C-92EF-3021CECB557E}.Debug|x64.Build.0 = Debug|Any CPU
+		{D22B6610-CF84-429C-92EF-3021CECB557E}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D22B6610-CF84-429C-92EF-3021CECB557E}.Debug|x86.Build.0 = Debug|Any CPU
+		{D22B6610-CF84-429C-92EF-3021CECB557E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D22B6610-CF84-429C-92EF-3021CECB557E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D22B6610-CF84-429C-92EF-3021CECB557E}.Release|x64.ActiveCfg = Release|Any CPU
+		{D22B6610-CF84-429C-92EF-3021CECB557E}.Release|x64.Build.0 = Release|Any CPU
+		{D22B6610-CF84-429C-92EF-3021CECB557E}.Release|x86.ActiveCfg = Release|Any CPU
+		{D22B6610-CF84-429C-92EF-3021CECB557E}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
-	EndGlobalSection
-	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {D3E09693-C098-4255-AF4F-A3C146042959}
 	EndGlobalSection
 EndGlobal

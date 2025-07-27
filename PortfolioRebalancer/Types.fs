@@ -1,11 +1,14 @@
 ﻿module Types
 
+// Enhanced error types with better categorization
 type ScrapingError = 
     | NavigationError of string
     | ElementNotFound of string
     | DataExtractionError of string
     | PortfolioCreationError of string
     | FileOperationError of string
+    | TimeoutError of string
+    | NetworkError of string
 
 type ValidationError =
     | InvalidCashAmount of decimal
@@ -14,6 +17,27 @@ type ValidationError =
     | EmptyIndex
     | EmptyPortfolio
     | InsufficientData of string
+    | InvalidWeight of decimal
+    | InvalidPrice of decimal
+    | InvalidShares of int
+
+type DatabaseError =
+    | ConnectionError of string
+    | QueryError of string
+    | DataError of string
+    | TransactionError of string
+
+type ApplicationError =
+    | Validation of ValidationError
+    | Scraping of ScrapingError
+    | Database of DatabaseError
+    | Configuration of string
+    | Unexpected of string
+
+// Enhanced result types for better error handling
+type OperationResult<'T> = Result<'T, ApplicationError>
+type ValidationResult<'T> = Result<'T, ValidationError>
+type DatabaseResult<'T> = Result<'T, DatabaseError>
 
 [<CLIMutable>]
 type IndexTableRecord = {

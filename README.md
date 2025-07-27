@@ -46,30 +46,132 @@ The application follows functional programming principles with clear separation 
 ### Prerequisites
 
 - .NET 9.0 SDK
-- PostgreSQL database
+- PostgreSQL database (or Docker for containerized setup)
 - Chrome browser (for web scraping)
+
+### Database Setup
+
+#### Option 1: Docker (Recommended for Development)
+
+Run PostgreSQL in a Docker container:
+
+```bash
+docker run --name portfolio-postgres \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres1234 \
+  -e POSTGRES_DB=portfolio \
+  -p 5432:5432 \
+  -d postgres
+```
+
+**Docker Commands:**
+```bash
+# Start the database
+docker start portfolio-postgres
+
+# Stop the database
+docker stop portfolio-postgres
+
+# Remove the container
+docker rm portfolio-postgres
+
+# View logs
+docker logs portfolio-postgres
+
+# Connect to database
+docker exec -it portfolio-postgres psql -U postgres -d portfolio
+```
+
+#### Option 2: Local PostgreSQL Installation
+
+1. Install PostgreSQL on your system
+2. Create a database named `portfolio`
+3. Update connection string in `Configuration.fs`
 
 ### Installation
 
-1. Clone the repository
-2. Set up PostgreSQL database
-3. Update connection string in `Configuration.fs`
-4. Build the project:
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd PortfolioRebalancer
+   ```
+
+2. Build the project:
    ```bash
    dotnet build
    ```
 
-### Running the Application
+3. Run the application:
+   ```bash
+   dotnet run
+   ```
 
+## Testing
+
+### Running Tests
+
+The project includes comprehensive unit tests with detailed logging:
+
+#### Basic Test Execution
 ```bash
-dotnet run
+# Run all tests
+dotnet test
+
+# Run tests with detailed output
+dotnet test --logger "console;verbosity=detailed"
+
+# Run tests with normal verbosity
+dotnet test --verbosity normal
 ```
 
-The application provides an interactive menu for:
-- Viewing current portfolio and index data
-- Importing portfolio data from JSON
-- Performing rebalancing calculations
-- Scraping market data
+#### Detailed Test Logging
+```bash
+# Set environment variable for persistent detailed output
+$env:DOTNET_CLI_VSTEST_VERBOSITY="detailed"
+dotnet test
+```
+
+#### Test Output Example
+```
+[TEST] Starting test: Basic arithmetic test
+   └─ Timestamp: 16:15:23.456
+   ├─ Assertion: Testing addition: 5 + 3
+   ├─ Assertion: Result: 8
+   ├─ Assertion: Addition test passed
+   ├─ Assertion: Testing multiplication: 5 * 3 = 15
+   ├─ Assertion: Multiplication test passed
+[PASS] Completed test: Basic arithmetic test
+   └─ Duration: 00:00:00.0012345
+
+[TEST] Starting test: List operations test
+   └─ Timestamp: 16:15:23.458
+   ├─ Assertion: Testing list operations with: [1; 2; 3; 4; 5]
+   ├─ Assertion: Sum: 15
+   ├─ Assertion: List sum test passed
+   ├─ Assertion: Doubled list: [2; 4; 6; 8; 10]
+   ├─ Assertion: List map test passed
+   ├─ Assertion: Even numbers: [2; 4]
+   ├─ Assertion: List filter test passed
+[PASS] Completed test: List operations test
+   └─ Duration: 00:00:00.0005678
+```
+
+#### Test Categories
+
+The test suite includes:
+- **Unit Tests**: Individual function testing
+- **Theory Tests**: Parameterized testing with multiple data sets
+- **Performance Tests**: Performance simulation and monitoring
+- **Validation Tests**: Input validation and error handling
+- **Integration Tests**: Database and external service testing
+
+### Test Features
+
+- **Detailed Logging**: Each test step is logged with timestamps
+- **Performance Tracking**: Test execution time monitoring
+- **Error Reporting**: Comprehensive error details and stack traces
+- **Assertion Logging**: Each assertion is logged with context
+- **Theory Testing**: Multiple test cases with different inputs
 
 ## Usage Examples
 
@@ -101,20 +203,6 @@ let config = {
 let result = rebalanceCurrentPortfolio config
 ```
 
-## Testing
-
-Run the test suite:
-
-```bash
-dotnet test
-```
-
-The test project includes unit tests for:
-- Validation functions
-- Commission calculations
-- Data parsing
-- Business logic
-
 ## Configuration
 
 Key configuration options in `Configuration.fs`:
@@ -123,6 +211,14 @@ Key configuration options in `Configuration.fs`:
 - **Database settings**: Connection strings and timeouts
 - **Validation rules**: Input validation constraints
 - **Application settings**: Culture, currency, and formatting options
+
+### Database Configuration
+
+The application automatically detects the environment and uses appropriate database settings:
+
+- **Development**: Uses local PostgreSQL connection
+- **Production**: Uses `DATABASE_URL` environment variable
+- **Docker**: Uses default PostgreSQL connection string
 
 ## Performance Features
 
@@ -153,6 +249,53 @@ Comprehensive logging with different levels:
 - **Warning**: Non-critical issues
 - **Error**: Critical errors and exceptions
 
+## Development Workflow
+
+### Quick Start for Development
+
+1. **Start Database:**
+   ```bash
+   docker run --name portfolio-postgres \
+     -e POSTGRES_USER=postgres \
+     -e POSTGRES_PASSWORD=postgres1234 \
+     -e POSTGRES_DB=portfolio \
+     -p 5432:5432 \
+     -d postgres
+   ```
+
+2. **Build and Test:**
+   ```bash
+   dotnet build
+   dotnet test --logger "console;verbosity=detailed"
+   ```
+
+3. **Run Application:**
+   ```bash
+   dotnet run
+   ```
+
+### Common Commands
+
+```bash
+# Clean and rebuild
+dotnet clean
+dotnet build
+
+# Run tests with detailed logging
+dotnet test --logger "console;verbosity=detailed"
+
+# Run specific test project
+dotnet test PortfolioRebalancer.Tests/
+
+# Set detailed verbosity for all test runs
+$env:DOTNET_CLI_VSTEST_VERBOSITY="detailed"
+
+# Database management
+docker start portfolio-postgres
+docker stop portfolio-postgres
+docker logs portfolio-postgres
+```
+
 ## Contributing
 
 1. Follow F# coding conventions
@@ -160,6 +303,14 @@ Comprehensive logging with different levels:
 3. Add tests for new functionality
 4. Update documentation
 5. Use functional programming patterns
+
+### Testing Guidelines
+
+- Write tests for all new functionality
+- Use detailed logging in tests for better debugging
+- Include both positive and negative test cases
+- Test edge cases and error conditions
+- Use theory tests for parameterized testing
 
 ## License
 
@@ -170,4 +321,5 @@ This project is licensed under the MIT License.
 - Built with F# and .NET 9.0
 - Uses Spectre.Console for rich terminal output
 - PostgreSQL for data persistence
-- Selenium for web scraping 
+- Selenium for web scraping
+- xUnit for comprehensive testing 

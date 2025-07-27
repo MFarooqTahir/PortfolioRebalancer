@@ -8,7 +8,6 @@ open Configuration
 open Validation
 open Logging
 
-// docker run --name portfolio-postgres -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres1234 -e POSTGRES_DB=portfolio -p 5432:5432 -d postgres
 OptionTypes.register()
 
 type DatabaseError =
@@ -23,6 +22,8 @@ let private getConnection() =
     | ex -> 
         logger.Error (sprintf "Failed to create database connection: %s" ex.Message)
         reraise()
+
+// Note: Retry logic removed for simplicity - can be added later with proper exception handling
 let ensureTablesAsync() = async {
     use conn = getConnection()
     do! conn.OpenAsync() |> Async.AwaitTask
