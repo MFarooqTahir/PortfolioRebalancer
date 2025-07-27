@@ -1,5 +1,6 @@
 ---
-alwaysApply: true
+globs: *.fs
+alwaysApply: false
 ---
 - Please always use the F# best practices and make sure you dont add anything necessary.
 - Make sure the code is always optimized and not doing unnecessary stuff.

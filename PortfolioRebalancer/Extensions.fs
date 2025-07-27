@@ -27,10 +27,10 @@ module MapExtensions =
 
 module DecimalExtensions =
     let toPercentage (value: decimal) =
-        value.ToString("P2")
+        value.ToString "P2"
     
     let toCurrency (value: decimal) =
-        value.ToString("C2")
+        value.ToString "C2"
     
     let isPositive (value: decimal) =
         value > 0m

@@ -9,6 +9,7 @@ open Configuration
 open Extensions
 open Messages
 open RebalancingCalculations
+open Spectre.Console
 
 // ============================================================================
 // VALIDATION TESTS
@@ -485,4 +486,45 @@ let ``Messages should contain success messages`` () =
 [<Fact>]
 let ``Messages should contain info messages`` () =
     Assert.NotNull Info.LoadingPortfolioData
-    Assert.NotNull Info.PerformingRebalancing 
+    Assert.NotNull Info.PerformingRebalancing
+
+// ============================================================================
+// TEST OUTPUT ENHANCEMENT
+// ============================================================================
+
+// Custom test output with Spectre.Console
+let printTestSummary (passed: int) (failed: int) (total: int) =
+    let summaryTable = 
+        Table()
+            .Title("[bold blue]Test Summary[/]")
+            .AddColumns([|"Metric"; "Count"|])
+            .AddRow("[green]Passed[/]", string passed)
+            .AddRow("[red]Failed[/]", string failed)
+            .AddRow("[blue]Total[/]", string total)
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Blue)
+    
+    AnsiConsole.Write(summaryTable)
+
+// Test categories for better organization
+let testCategories = [
+    ("Validation", 15)
+    ("Helper Functions", 5)
+    ("Extensions", 12)
+    ("Rebalancing Calculations", 8)
+    ("Configuration", 3)
+    ("Messages", 3)
+]
+
+let printTestCategories () =
+    let categoryTable = 
+        Table()
+            .Title("[bold green]Test Categories[/]")
+            .AddColumns([|"Category"; "Test Count"|])
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Green)
+    
+    for (category, count) in testCategories do
+        categoryTable.AddRow(category, string count) |> ignore
+    
+    AnsiConsole.Write(categoryTable) 

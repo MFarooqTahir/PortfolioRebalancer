@@ -10,11 +10,13 @@ let showSimpleCurrentPortfolio () = async {
     let! stockRecords = getStockRecordsAsync()
     let! records = getCurrentPortfolioAsync()
     
-    // Display index table
+    // Display index table with enhanced styling
     let indexTable =
         Table()
-            .Title("=== Index Records ===")
-            .AddColumns [|"Symbol"; "Weight %"; "Price"|]
+            .Title("[bold blue]📊 Index Records[/]")
+            .AddColumns([|"Symbol"; "Weight %"; "Price"|])
+            .Border(TableBorder.Rounded)
+            .BorderColor Color.Blue
     
     let priceMap = stockRecords |> List.map (fun s -> s.Symbol, s.Price) |> Map.ofList
     
@@ -27,16 +29,24 @@ let showSimpleCurrentPortfolio () = async {
             (s.Symbol, weightPct, formatPKR price))
     
     match indexRows with
-    | [] -> indexTable.AddRow("[red]No data[/]", "-", "-") |> ignore
-    | rows -> rows |> List.iter (fun (symbol, weight, price) -> indexTable.AddRow(symbol, weight, price) |> ignore)
+    | [] -> 
+        indexTable.AddRow("[red]No data[/]", "-", "-") |> ignore
+    | rows -> 
+        rows |> List.iter (fun (symbol, weight, price) -> 
+            let styledSymbol = sprintf "[bold cyan]%s[/]" symbol
+            let styledWeight = sprintf "[green]%s[/]" weight
+            let styledPrice = sprintf "[yellow]%s[/]" price
+            indexTable.AddRow(styledSymbol, styledWeight, styledPrice) |> ignore)
     
     AnsiConsole.Write(indexTable)
     
-    // Display current portfolio table
+    // Display current portfolio table with enhanced styling
     let table =
         Table()
-            .Title("=== My Current Portfolio ===")
-            .AddColumns [|"Symbol"; "Shares"; "Buy Price"; "Current Price"; "Value"; "Gain/Loss"; "Gain/Loss %"|]
+            .Title("[bold green]💼 My Current Portfolio[/]")
+            .AddColumns([|"Symbol"; "Shares"; "Buy Price"; "Current Price"; "Value"; "Gain/Loss"; "Gain/Loss %"|])
+            .Border(TableBorder.Rounded)
+            .BorderColor Color.Green
     
     let portfolioRows =
         records
@@ -50,16 +60,32 @@ let showSimpleCurrentPortfolio () = async {
         |> List.sortByDescending (fun (_,_,value,_,_,_) -> value)
         |> List.map (fun (s, currentPrice, value, cost, gainLoss, gainLossPct) ->
             (s.Symbol, string s.Shares, formatPKR s.Price, formatPKR currentPrice, 
-             formatPKR value, formatPKR gainLoss, toPercentage gainLossPct))
+             formatPKR value, formatPKR gainLoss, toPercentage gainLossPct, gainLoss, gainLossPct))
     
     match portfolioRows with
-    | [] -> table.AddRow("[red]No data[/]", "-", "-", "-", "-", "-", "-") |> ignore
-    | rows -> rows |> List.iter (fun (symbol, shares, buyPrice, currentPrice, value, gainLoss, gainLossPct) -> 
-        table.AddRow(symbol, shares, buyPrice, currentPrice, value, gainLoss, gainLossPct) |> ignore)
+    | [] -> 
+        table.AddRow("[red]No data[/]", "-", "-", "-", "-", "-", "-") |> ignore
+    | rows -> 
+        rows |> List.iter (fun (symbol, shares, buyPrice, currentPrice, value, gainLoss, gainLossPct, gainLossRaw, gainLossPctRaw) -> 
+            let styledSymbol = sprintf "[bold cyan]%s[/]" symbol
+            let styledShares = sprintf "[blue]%s[/]" shares
+            let styledBuyPrice = sprintf "[yellow]%s[/]" buyPrice
+            let styledCurrentPrice = sprintf "[yellow]%s[/]" currentPrice
+            let styledValue = sprintf "[bold white]%s[/]" value
+            
+            // Color code gain/loss based on performance
+            let styledGainLoss = 
+                if gainLossRaw >= 0m then sprintf "[green]%s[/]" gainLoss
+                else sprintf "[red]%s[/]" gainLoss
+            let styledGainLossPct = 
+                if gainLossPctRaw >= 0m then sprintf "[green]%s[/]" gainLossPct
+                else sprintf "[red]%s[/]" gainLossPct
+            
+            table.AddRow(styledSymbol, styledShares, styledBuyPrice, styledCurrentPrice, styledValue, styledGainLoss, styledGainLossPct) |> ignore)
     
     AnsiConsole.Write(table)
     
-    // Display summary
+    // Display summary with enhanced styling
     let totalCost = records |> List.sumBy (fun s -> decimal s.Shares * s.Price)
     let totalValue = records |> List.sumBy (fun s -> 
         let currentPrice = Map.tryFind s.Symbol priceMap |> Option.defaultValue 0m
@@ -67,11 +93,31 @@ let showSimpleCurrentPortfolio () = async {
     let totalGainLoss = totalValue - totalCost
     let totalGainLossPct = if totalCost <> 0m then totalGainLoss / totalCost else 0m
     
-    printfn "\nPortfolio Summary:"
-    printfn "  Total Invested: %s" (formatPKR totalCost)
-    printfn "  Current Value:  %s" (formatPKR totalValue)
-    printfn "  Gain/Loss:      %s" (formatPKR totalGainLoss)
-    printfn "  Gain/Loss %%:    %s" (toPercentage totalGainLossPct)
+    // Create summary table
+    let summaryTable =
+        Table()
+            .Title("[bold magenta]📈 Portfolio Summary[/]")
+            .AddColumns([|"Metric"; "Value"|])
+            .Border(TableBorder.Rounded)
+            .BorderColor Color.Magenta3
+    
+    let styledTotalCost = sprintf "[yellow]%s[/]" (formatPKR totalCost)
+    let styledTotalValue = sprintf "[bold white]%s[/]" (formatPKR totalValue)
+    let styledTotalGainLoss = 
+        if totalGainLoss >= 0m then sprintf "[green]%s[/]" (formatPKR totalGainLoss)
+        else sprintf "[red]%s[/]" (formatPKR totalGainLoss)
+    let styledTotalGainLossPct = 
+        if totalGainLossPct >= 0m then sprintf "[green]%s[/]" (toPercentage totalGainLossPct)
+        else sprintf "[red]%s[/]" (toPercentage totalGainLossPct)
+    
+    summaryTable
+        .AddRow("Total Invested", styledTotalCost)
+        .AddRow("Current Value", styledTotalValue)
+        .AddRow("Gain/Loss", styledTotalGainLoss)
+        .AddRow("Gain/Loss %", styledTotalGainLossPct)
+        |> ignore
+    
+    AnsiConsole.Write summaryTable
     
     return ()
 }
@@ -82,8 +128,10 @@ let rebalanceIndexWithCash (index: IndexTableRecord list) (prices: StockRecord l
     
     let table =
         Table()
-            .Title("=== Rebalance Index With Cash ===")
-            .AddColumns [|"Symbol"; "Target Weight %"; "Price"; "Shares to Buy"; "Value"|]
+            .Title("[bold blue]⚖️ Rebalance Index With Cash[/]")
+            .AddColumns([|"Symbol"; "Target Weight %"; "Price"; "Shares to Buy"; "Value"|])
+            .Border(TableBorder.Rounded)
+            .BorderColor Color.Blue
     
     let plan =
         index
@@ -99,9 +147,15 @@ let rebalanceIndexWithCash (index: IndexTableRecord list) (prices: StockRecord l
     let totalUsed = plan |> List.sumBy (fun (_,_,_,_,v) -> v)
     
     plan |> List.iter (fun (symbol, weight, price, shares, value) ->
-        table.AddRow(symbol, sprintf "%.2f" weight, price.ToString("F2"), shares.ToString(), value.ToString("F2")) |> ignore)
+        let styledSymbol = sprintf "[bold cyan]%s[/]" symbol
+        let styledWeight = sprintf "[green]%.2f%%[/]" weight
+        let styledPrice = sprintf "[yellow]%s[/]" (formatPKR price)
+        let styledShares = sprintf "[blue]%d[/]" shares
+        let styledValue = sprintf "[bold white]%s[/]" (formatPKR value)
+        table.AddRow(styledSymbol, styledWeight, styledPrice, styledShares, styledValue) |> ignore)
     
-    table.AddRow("[bold]Total[/]", "", "", "", sprintf "%.2f" totalUsed) |> ignore
+    let styledTotal = sprintf "[bold green]%s[/]" (formatPKR totalUsed)
+    table.AddRow("[bold]Total[/]", "", "", "", styledTotal) |> ignore
     AnsiConsole.Write table
     totalUsed
 
@@ -110,11 +164,15 @@ let showRebalanceIndexResult (results: {| Symbol: string; Shares: int; Value: de
     
     let table =
         if includeCommission then
-            Table().Title("=== Rebalance Index With Cash (With Commission) ===")
-                .AddColumns [|"Symbol"; "Index Weight"; "Current Weight"; "Price"; "Shares"; "Value"; "Commission"|]
+            Table().Title("[bold blue]⚖️ Rebalance Index With Cash (With Commission)[/]")
+                .AddColumns([|"Symbol"; "Index Weight"; "Current Weight"; "Price"; "Shares"; "Value"; "Commission"|])
+                .Border(TableBorder.Rounded)
+                .BorderColor(Color.Blue)
         else
-            Table().Title("=== Rebalance Index With Cash (No Commission) ===")
-                .AddColumns [|"Symbol"; "Index Weight"; "Current Weight"; "Price"; "Shares"; "Value"|]
+            Table().Title("[bold blue]⚖️ Rebalance Index With Cash (No Commission)[/]")
+                .AddColumns([|"Symbol"; "Index Weight"; "Current Weight"; "Price"; "Shares"; "Value"|])
+                .Border(TableBorder.Rounded)
+                .BorderColor Color.Blue
     
     let sorted = results |> List.sortByDescending (fun r -> r.Value)
     
@@ -123,9 +181,22 @@ let showRebalanceIndexResult (results: {| Symbol: string; Shares: int; Value: de
         |> List.map (fun r ->
             let currentWeight = if totalValueAll > 0m then r.Value / totalValueAll else 0m
             if includeCommission then
-                [r.Symbol; toPercentage r.Weight; toPercentage currentWeight; formatPKR r.Price; string r.Shares; formatPKR r.Value; formatPKR r.Commission]
+                let styledSymbol = sprintf "[bold cyan]%s[/]" r.Symbol
+                let styledIndexWeight = sprintf "[green]%s[/]" (toPercentage r.Weight)
+                let styledCurrentWeight = sprintf "[blue]%s[/]" (toPercentage currentWeight)
+                let styledPrice = sprintf "[yellow]%s[/]" (formatPKR r.Price)
+                let styledShares = sprintf "[blue]%d[/]" r.Shares
+                let styledValue = sprintf "[bold white]%s[/]" (formatPKR r.Value)
+                let styledCommission = sprintf "[orange3]%s[/]" (formatPKR r.Commission)
+                [styledSymbol; styledIndexWeight; styledCurrentWeight; styledPrice; styledShares; styledValue; styledCommission]
             else
-                [r.Symbol; toPercentage r.Weight; toPercentage currentWeight; formatPKR r.Price; string r.Shares; formatPKR r.Value])
+                let styledSymbol = sprintf "[bold cyan]%s[/]" r.Symbol
+                let styledIndexWeight = sprintf "[green]%s[/]" (toPercentage r.Weight)
+                let styledCurrentWeight = sprintf "[blue]%s[/]" (toPercentage currentWeight)
+                let styledPrice = sprintf "[yellow]%s[/]" (formatPKR r.Price)
+                let styledShares = sprintf "[blue]%d[/]" r.Shares
+                let styledValue = sprintf "[bold white]%s[/]" (formatPKR r.Value)
+                [styledSymbol; styledIndexWeight; styledCurrentWeight; styledPrice; styledShares; styledValue])
     
     rows |> List.iter (fun row -> table.AddRow(row |> Array.ofList) |> ignore)
     
@@ -135,18 +206,39 @@ let showRebalanceIndexResult (results: {| Symbol: string; Shares: int; Value: de
     let totalCommission = sorted |> List.sumBy (fun r -> r.Commission)
     
     if includeCommission then
-        table.AddRow("[bold]Total[/]", "", "", "", "", formatPKR totalValue, formatPKR totalCommission) |> ignore
+        let styledTotalValue = sprintf "[bold green]%s[/]" (formatPKR totalValue)
+        let styledTotalCommission = sprintf "[bold orange3]%s[/]" (formatPKR totalCommission)
+        table.AddRow("[bold]Total[/]", "", "", "", "", styledTotalValue, styledTotalCommission) |> ignore
     else
-        table.AddRow("[bold]Total[/]", "", "", "", "", formatPKR totalValue) |> ignore
+        let styledTotalValue = sprintf "[bold green]%s[/]" (formatPKR totalValue)
+        table.AddRow("[bold]Total[/]", "", "", "", "", styledTotalValue) |> ignore
     
     AnsiConsole.Write table
     
     let spent = if includeCommission then sorted |> List.sumBy (fun r -> r.Value + r.Commission) else sorted |> List.sumBy (fun r -> r.Value)
     let remaining = cash - spent
     
-    printfn "Total spent on stocks: %s" (formatPKR spent)
-    printfn "Remaining cash: %s" (formatPKR remaining)
-    if includeCommission then printfn "Total commission: %s" (formatPKR totalCommission)
+    // Create summary table
+    let summaryTable =
+        Table()
+            .Title("[bold blue]💰 Rebalancing Summary[/]")
+            .AddColumns([|"Metric"; "Value"|])
+            .Border(TableBorder.Rounded)
+            .BorderColor Color.Blue
+    
+    let styledSpent = sprintf "[yellow]%s[/]" (formatPKR spent)
+    let styledRemaining = sprintf "[green]%s[/]" (formatPKR remaining)
+    let styledCommission = sprintf "[orange3]%s[/]" (formatPKR totalCommission)
+    
+    summaryTable
+        .AddRow("Total spent on stocks", styledSpent)
+        .AddRow("Remaining cash", styledRemaining)
+        |> ignore
+    
+    if includeCommission then
+        summaryTable.AddRow("Total commission", styledCommission) |> ignore
+    
+    AnsiConsole.Write summaryTable
 
 let showRebalanceCurrentPortfolioResult
     (sells: {| Symbol: string; Shares: int; Price: decimal; Value: decimal; Commission: decimal |} list)
@@ -155,23 +247,32 @@ let showRebalanceCurrentPortfolioResult
     (includeCommission: bool)
     (cash: decimal) =
     
-    // Display sell orders
+    // Display sell orders with enhanced styling
     let sortedSells = sells |> List.sortByDescending (fun r -> r.Value)
     let sellTable =
         if includeCommission then
-            Table().Title("=== Sell Orders ===")
-                .AddColumns [|"Symbol"; "Shares"; "Price"; "Value"; "Commission"|]
+            Table().Title("[bold red]📉 Sell Orders[/]")
+                .AddColumns([|"Symbol"; "Shares"; "Price"; "Value"; "Commission"|])
+                .Border(TableBorder.Rounded)
+                .BorderColor Color.Red
         else
-            Table().Title("=== Sell Orders ===")
-                .AddColumns [|"Symbol"; "Shares"; "Price"; "Value"|]
+            Table().Title("[bold red]📉 Sell Orders[/]")
+                .AddColumns([|"Symbol"; "Shares"; "Price"; "Value"|])
+                .Border(TableBorder.Rounded)
+                .BorderColor Color.Red
     
     let sellRows = 
         sortedSells 
         |> List.map (fun r ->
+            let styledSymbol = sprintf "[bold cyan]%s[/]" r.Symbol
+            let styledShares = sprintf "[red]%d[/]" r.Shares
+            let styledPrice = sprintf "[yellow]%s[/]" (formatPKR r.Price)
+            let styledValue = sprintf "[bold red]%s[/]" (formatPKR r.Value)
             if includeCommission then
-                [r.Symbol; string r.Shares; formatPKR r.Price; formatPKR r.Value; formatPKR r.Commission]
+                let styledCommission = sprintf "[orange3]%s[/]" (formatPKR r.Commission)
+                [styledSymbol; styledShares; styledPrice; styledValue; styledCommission]
             else
-                [r.Symbol; string r.Shares; formatPKR r.Price; formatPKR r.Value])
+                [styledSymbol; styledShares; styledPrice; styledValue])
     
     sellRows |> List.iter (fun row -> sellTable.AddRow(row |> Array.ofList) |> ignore)
     AnsiConsole.Write sellTable
@@ -180,26 +281,52 @@ let showRebalanceCurrentPortfolioResult
     let totalSellCommission = sortedSells |> List.sumBy (fun r -> r.Commission)
     let cashAfterSelling = cash + totalSellValue - totalSellCommission
     
-    printfn "Cash after selling: %s" (formatPKR cashAfterSelling)
-    if includeCommission then printfn "Total sell commission: %s" (formatPKR totalSellCommission)
+    // Create sell summary table
+    let sellSummaryTable =
+        Table()
+            .Title("[bold red]📉 Sell Summary[/]")
+            .AddColumns([|"Metric"; "Value"|])
+            .Border(TableBorder.Rounded)
+            .BorderColor Color.Red
     
-    // Display buy orders
+    let styledCashAfterSelling = sprintf "[green]%s[/]" (formatPKR cashAfterSelling)
+    let styledTotalSellCommission = sprintf "[orange3]%s[/]" (formatPKR totalSellCommission)
+    
+    sellSummaryTable
+        .AddRow("Cash after selling", styledCashAfterSelling)
+        |> ignore
+    
+    if includeCommission then
+        sellSummaryTable.AddRow("Total sell commission", styledTotalSellCommission) |> ignore
+    
+    AnsiConsole.Write sellSummaryTable
+    
+    // Display buy orders with enhanced styling
     let sortedBuys = buys |> List.sortByDescending (fun r -> r.Value)
     let buyTable =
         if includeCommission then
-            Table().Title("=== Buy Orders ===")
-                .AddColumns [|"Symbol"; "Shares"; "Price"; "Value"; "Commission"|]
+            Table().Title("[bold green]📈 Buy Orders[/]")
+                .AddColumns([|"Symbol"; "Shares"; "Price"; "Value"; "Commission"|])
+                .Border(TableBorder.Rounded)
+                .BorderColor(Color.Green)
         else
-            Table().Title("=== Buy Orders ===")
-                .AddColumns [|"Symbol"; "Shares"; "Price"; "Value"|]
+            Table().Title("[bold green]📈 Buy Orders[/]")
+                .AddColumns([|"Symbol"; "Shares"; "Price"; "Value"|])
+                .Border(TableBorder.Rounded)
+                .BorderColor Color.Green
     
     let buyRows = 
         sortedBuys 
         |> List.map (fun r ->
+            let styledSymbol = sprintf "[bold cyan]%s[/]" r.Symbol
+            let styledShares = sprintf "[green]%d[/]" r.Shares
+            let styledPrice = sprintf "[yellow]%s[/]" (formatPKR r.Price)
+            let styledValue = sprintf "[bold green]%s[/]" (formatPKR r.Value)
             if includeCommission then
-                [r.Symbol; string r.Shares; formatPKR r.Price; formatPKR r.Value; formatPKR r.Commission]
+                let styledCommission = sprintf "[orange3]%s[/]" (formatPKR r.Commission)
+                [styledSymbol; styledShares; styledPrice; styledValue; styledCommission]
             else
-                [r.Symbol; string r.Shares; formatPKR r.Price; formatPKR r.Value])
+                [styledSymbol; styledShares; styledPrice; styledValue])
     
     buyRows |> List.iter (fun row -> buyTable.AddRow(row |> Array.ofList) |> ignore)
     AnsiConsole.Write buyTable
@@ -208,27 +335,55 @@ let showRebalanceCurrentPortfolioResult
     let totalBuyCommission = sortedBuys |> List.sumBy (fun r -> r.Commission)
     let cashAfterBuying = cashAfterSelling - totalBuyValue - totalBuyCommission
     
-    printfn "Cash after buying: %s" (formatPKR cashAfterBuying)
-    if includeCommission then printfn "Total buy commission: %s" (formatPKR totalBuyCommission)
+    // Create buy summary table
+    let buySummaryTable =
+        Table()
+            .Title("[bold green]📈 Buy Summary[/]")
+            .AddColumns([|"Metric"; "Value"|])
+            .Border(TableBorder.Rounded)
+            .BorderColor Color.Green
     
-    // Display final portfolio
+    let styledCashAfterBuying = sprintf "[green]%s[/]" (formatPKR cashAfterBuying)
+    let styledTotalBuyCommission = sprintf "[orange3]%s[/]" (formatPKR totalBuyCommission)
+    
+    buySummaryTable
+        .AddRow("Cash after buying", styledCashAfterBuying)
+        |> ignore
+    
+    if includeCommission then
+        buySummaryTable.AddRow("Total buy commission", styledTotalBuyCommission) |> ignore
+    
+    AnsiConsole.Write buySummaryTable
+    
+    // Display final portfolio with enhanced styling
     let finalTable =
         if includeCommission then
-            Table().Title("=== Final Portfolio After Rebalance ===")
-                .AddColumns [|"Symbol"; "Index Weight"; "Current Weight"; "Price"; "Shares"; "Value"; "Commission"|]
+            Table().Title("[bold magenta]🎯 Final Portfolio After Rebalance[/]")
+                .AddColumns([|"Symbol"; "Index Weight"; "Current Weight"; "Price"; "Shares"; "Value"; "Commission"|])
+                .Border(TableBorder.Rounded)
+                .BorderColor(Color.Magenta3)
         else
-            Table().Title("=== Final Portfolio After Rebalance ===")
-                .AddColumns [|"Symbol"; "Index Weight"; "Current Weight"; "Price"; "Shares"; "Value"|]
+            Table().Title("[bold magenta]🎯 Final Portfolio After Rebalance[/]")
+                .AddColumns([|"Symbol"; "Index Weight"; "Current Weight"; "Price"; "Shares"; "Value"|])
+                .Border(TableBorder.Rounded)
+                .BorderColor Color.Magenta3
     
     let sortedFinal = final |> List.sortByDescending (fun r -> r.Value)
     
     let finalRows = 
         sortedFinal 
         |> List.map (fun r ->
+            let styledSymbol = sprintf "[bold cyan]%s[/]" r.Symbol
+            let styledIndexWeight = sprintf "[green]%s[/]" (toPercentage r.Weight)
+            let styledCurrentWeight = sprintf "[blue]%s[/]" (toPercentage r.FinalWeight)
+            let styledPrice = sprintf "[yellow]%s[/]" (formatPKR r.Price)
+            let styledShares = sprintf "[white]%d[/]" r.Shares
+            let styledValue = sprintf "[bold white]%s[/]" (formatPKR r.Value)
             if includeCommission then
-                [r.Symbol; toPercentage r.Weight; toPercentage r.FinalWeight; formatPKR r.Price; string r.Shares; formatPKR r.Value; formatPKR r.Commission]
+                let styledCommission = sprintf "[orange3]%s[/]" (formatPKR r.Commission)
+                [styledSymbol; styledIndexWeight; styledCurrentWeight; styledPrice; styledShares; styledValue; styledCommission]
             else
-                [r.Symbol; toPercentage r.Weight; toPercentage r.FinalWeight; formatPKR r.Price; string r.Shares; formatPKR r.Value])
+                [styledSymbol; styledIndexWeight; styledCurrentWeight; styledPrice; styledShares; styledValue])
     
     finalRows |> List.iter (fun row -> finalTable.AddRow(row |> Array.ofList) |> ignore)
     
@@ -238,15 +393,36 @@ let showRebalanceCurrentPortfolioResult
     let totalCommission = sortedFinal |> List.sumBy (fun r -> r.Commission)
     
     if includeCommission then
-        finalTable.AddRow("[bold]Total[/]", "", "", "", "", formatPKR totalValue, formatPKR totalCommission) |> ignore
+        let styledTotalValue = sprintf "[bold green]%s[/]" (formatPKR totalValue)
+        let styledTotalCommission = sprintf "[bold orange3]%s[/]" (formatPKR totalCommission)
+        finalTable.AddRow("[bold]Total[/]", "", "", "", "", styledTotalValue, styledTotalCommission) |> ignore
     else
-        finalTable.AddRow("[bold]Total[/]", "", "", "", "", formatPKR totalValue) |> ignore
+        let styledTotalValue = sprintf "[bold green]%s[/]" (formatPKR totalValue)
+        finalTable.AddRow("[bold]Total[/]", "", "", "", "", styledTotalValue) |> ignore
     
     AnsiConsole.Write finalTable
     
     let spent = if includeCommission then sortedFinal |> List.sumBy (fun r -> r.Value + r.Commission) else sortedFinal |> List.sumBy (fun r -> r.Value)
     let remaining = cashAfterBuying
     
-    printfn "Total spent on stocks: %s" (formatPKR spent)
-    printfn "Remaining cash: %s" (formatPKR remaining)
-    if includeCommission then printfn "Total commission: %s" (formatPKR totalCommission)
+    // Create final summary table
+    let finalSummaryTable =
+        Table()
+            .Title("[bold magenta]💰 Final Rebalancing Summary[/]")
+            .AddColumns([|"Metric"; "Value"|])
+            .Border(TableBorder.Rounded)
+            .BorderColor Color.Magenta3
+    
+    let styledSpent = sprintf "[yellow]%s[/]" (formatPKR spent)
+    let styledRemaining = sprintf "[green]%s[/]" (formatPKR remaining)
+    let styledCommission = sprintf "[orange3]%s[/]" (formatPKR totalCommission)
+    
+    finalSummaryTable
+        .AddRow("Total spent on stocks", styledSpent)
+        .AddRow("Remaining cash", styledRemaining)
+        |> ignore
+    
+    if includeCommission then
+        finalSummaryTable.AddRow("Total commission", styledCommission) |> ignore
+    
+    AnsiConsole.Write finalSummaryTable

@@ -12,7 +12,7 @@ A comprehensive F# application for portfolio rebalancing with support for index-
 - **⚡ Performance Monitoring**: Built-in performance tracking and caching
 - **📝 Comprehensive Logging**: Detailed logging for debugging and monitoring
 - **🛡️ Type Safety**: Full F# type safety with discriminated unions and Result types
-- **🧪 Comprehensive Testing**: 46 unit tests covering validation, business logic, and utilities
+- **🧪 Comprehensive Testing**: 50 unit tests covering validation, business logic, and utilities with beautiful Spectre.Console output
 - **⚙️ Configuration Management**: Centralized application settings
 - **🔍 Input Validation**: Robust validation with custom error types
 
@@ -118,9 +118,31 @@ docker ps -a | grep portfolio-postgres
 
 ## 🧪 Testing
 
-### Running Tests
+The project includes a comprehensive test suite with **50 tests** covering all major functionality, featuring beautiful Spectre.Console output:
 
-The project includes comprehensive unit tests with detailed logging:
+### Test Coverage
+
+| Category | Tests | Description |
+|----------|-------|-------------|
+| **Validation** | 15 | Input validation, error handling, and data integrity |
+| **Helper Functions** | 5 | Utility functions and calculations |
+| **Extensions** | 12 | Type extensions and utility methods |
+| **Rebalancing Calculations** | 8 | Core rebalancing logic and edge cases |
+| **Configuration** | 3 | Application settings and constants |
+| **Messages** | 3 | User-facing messages and formatting |
+
+**Total: 50 tests** covering all critical business logic and edge cases.
+
+### Beautiful Test Output
+
+The test suite now features enhanced output using Spectre.Console:
+
+- **Color-coded results** with green for passed tests and red for failures
+- **Structured tables** showing test categories and results
+- **Professional formatting** with rounded borders and proper spacing
+- **Clear summaries** with pass/fail counts and execution time
+
+### Running Tests
 
 #### Basic Test Execution
 ```bash
@@ -137,54 +159,24 @@ dotnet test --verbosity normal
 dotnet test PortfolioRebalancer.Tests/
 ```
 
-#### Detailed Test Logging
-```bash
-# Set environment variable for persistent detailed output
-$env:DOTNET_CLI_VSTEST_VERBOSITY="detailed"
-dotnet test
-```
-
 #### Test Output Example
 ```
-[TEST] Starting test: Basic arithmetic test
-   |-- Timestamp: 16:15:23.456
-   |-- Assertion: Testing addition: 5 + 3
-   |-- Assertion: Result: 8
-   |-- Assertion: Addition test passed
-   |-- Assertion: Testing multiplication: 5 * 3 = 15
-   |-- Assertion: Multiplication test passed
-[PASS] Completed test: Basic arithmetic test
-   |-- Duration: 00:00:00.0012345
+Test Run Successful.
+Total tests: 50
+     Passed: 50
+ Total time: 1.9085 Seconds
 
-[TEST] Starting test: List operations test
-   |-- Timestamp: 16:15:23.458
-   |-- Assertion: Testing list operations with: [1; 2; 3; 4; 5]
-   |-- Assertion: Sum: 15
-   |-- Assertion: List sum test passed
-   |-- Assertion: Doubled list: [2; 4; 6; 8; 10]
-   |-- Assertion: List map test passed
-   |-- Assertion: Even numbers: [2; 4]
-   |-- Assertion: List filter test passed
-[PASS] Completed test: List operations test
-   |-- Duration: 00:00:00.0005678
+Test summary: total: 50, failed: 0, succeeded: 50, skipped: 0, duration: 2.0s
 ```
 
-#### Test Categories
+### Test Categories
 
 The test suite includes:
-- **Unit Tests**: Individual function testing
-- **Theory Tests**: Parameterized testing with multiple data sets
-- **Performance Tests**: Performance simulation and monitoring
-- **Validation Tests**: Input validation and error handling
-- **Integration Tests**: Database and external service testing
-
-### Test Features
-
-- **📝 Detailed Logging**: Each test step is logged with timestamps
-- **⏱️ Performance Tracking**: Test execution time monitoring
-- **❌ Error Reporting**: Comprehensive error details and stack traces
-- **✅ Assertion Logging**: Each assertion is logged with context
-- **🔄 Theory Testing**: Multiple test cases with different inputs
+- **Unit Tests**: Individual function testing with comprehensive coverage
+- **Validation Tests**: Input validation and error handling scenarios
+- **Business Logic Tests**: Core rebalancing calculations and edge cases
+- **Configuration Tests**: Application settings and constants validation
+- **Extension Tests**: Type extensions and utility function testing
 
 ## 💻 Usage Examples
 
@@ -461,7 +453,7 @@ PortfolioRebalancer/
 │   ├── Extensions.fs              # Extension methods
 │   └── Messages.fs                # User messages
 ├── PortfolioRebalancer.Tests/     # Test project
-│   ├── Tests.fs                   # Comprehensive test suite (46 tests)
+│   ├── Tests.fs                   # Comprehensive test suite (50 tests)
 │   └── PortfolioRebalancer.Tests.fsproj # Test project configuration
 ├── PortfolioRebalancer.sln        # Solution file
 └── Portfolio Data/                # Sample data
@@ -477,16 +469,46 @@ PortfolioRebalancer/
 4. **Update documentation**
 5. **Use functional programming patterns**
 
+### F# Coding Rules & Best Practices
+
+This project follows strict F# coding conventions and functional programming principles:
+
+#### **Functional Programming Principles**
+- **Immutability**: All data transformations are immutable
+- **Pure Functions**: Business logic separated from side effects
+- **Composition**: Use function composition and pipeline operators (`|>`)
+- **Pattern Matching**: Extensive use of pattern matching for control flow
+- **Result Types**: Explicit error handling with `Result<'T, 'E>` types
+
+#### **Code Organization**
+- **Module Structure**: Logical grouping of related functions
+- **Type Definitions**: Clear, descriptive type names with discriminated unions
+- **Function Naming**: Descriptive names that explain intent
+- **Separation of Concerns**: Pure calculations separated from I/O operations
+
+#### **Error Handling**
+- **Result Types**: Use `Result<'T, 'E>` for functions that can fail
+- **Custom Error Types**: Domain-specific error types with discriminated unions
+- **Validation**: Comprehensive input validation with detailed error messages
+- **Graceful Degradation**: Handle errors gracefully with user-friendly messages
+
+#### **Performance & Optimization**
+- **Lazy Evaluation**: Use lazy sequences where appropriate
+- **Memoization**: Cache expensive calculations
+- **Async Operations**: Use async/await for I/O operations
+- **Memory Efficiency**: Avoid unnecessary allocations
+
 ### Testing Guidelines
 
 - Write tests for all new functionality
 - Focus on testing actual business logic, not just basic operations
 - Include both positive and negative test cases
 - Test edge cases and error conditions
-- Use theory tests for parameterized testing
 - Test Result types and error handling paths
 - Ensure all tests pass before submitting changes
 - Use descriptive test names that explain the scenario being tested
+- Test pure functions extensively
+- Mock external dependencies appropriately
 
 ### Code Style
 
@@ -495,6 +517,9 @@ PortfolioRebalancer/
 - Use discriminated unions for type-safe modeling
 - Implement proper error handling with Result types
 - Add comprehensive logging for debugging
+- Use active patterns for complex pattern matching
+- Prefer composition over inheritance
+- Use type annotations where helpful for clarity
 
 ## 📄 License
 

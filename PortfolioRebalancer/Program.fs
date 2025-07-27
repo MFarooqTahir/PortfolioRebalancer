@@ -9,6 +9,7 @@ open PortfolioImporter
 open Configuration
 open Validation
 open Performance
+open Spectre.Console
 
 // Enhanced menu options with better organization
 type MenuOption = 
@@ -22,7 +23,6 @@ type MenuOption =
     | Exit
     | Invalid
 
-// Parse user input to menu option with better validation
 let parseMenuOption (input: string) : MenuOption =
     match input.Trim() with
     | "1" -> ShowPortfolio
@@ -35,23 +35,26 @@ let parseMenuOption (input: string) : MenuOption =
     | "0" -> Exit
     | _ -> Invalid
 
-// Enhanced menu display with better formatting
+// Enhanced menu display with Spectre.Console table
 let displayMenu () =
-    printfn "\n╔══════════════════════════════════════════════════════════════╗"
-    printfn "║                    Portfolio Rebalancer                      ║"
-    printfn "╠══════════════════════════════════════════════════════════════╣"
-    printfn "║ 1. Show Index and Current Portfolio                          ║"
-    printfn "║ 2. Import Current Portfolio from JSON                        ║"
-    printfn "║ 3. Rebalance Index with Cash (optionally show commission)   ║"
-    printfn "║ 4. Rebalance Current Portfolio with Cash (optionally show)  ║"
-    printfn "║ 5. Get Index and Stock Data (scrape and save both to DB)     ║"
-    printfn "║ 6. Show Performance Metrics                                  ║"
-    printfn "║ 7. Clear Cache                                               ║"
-    printfn "║ 0. Exit                                                      ║"
-    printfn "╚══════════════════════════════════════════════════════════════╝"
-    printf "Select an option: "
+    let menuTable = 
+        Table()
+            .Title("[bold blue]Portfolio Rebalancer[/]")
+            .AddColumns([|"Option"; "Description"|])
+            .AddRow("1", "Show Index and Current Portfolio")
+            .AddRow("2", "Import Current Portfolio from JSON")
+            .AddRow("3", "Rebalance Index with Cash (optionally show commission)")
+            .AddRow("4", "Rebalance Current Portfolio with Cash (optionally show)")
+            .AddRow("5", "Get Index and Stock Data (scrape and save both to DB)")
+            .AddRow("6", "Show Performance Metrics")
+            .AddRow("7", "Clear Cache")
+            .AddRow("0", "Exit")
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Blue)
+    
+    AnsiConsole.Write(menuTable)
+    printf "\nSelect an option: "
 
-// Enhanced input validation with better user experience
 let rec getCashAmount () : decimal option =
     printf "Enter cash amount: "
     match Console.ReadLine() with
@@ -103,15 +106,15 @@ let handleRebalancing (kind: string) (includeCommission: bool) =
 let printErrors (result: Result<unit, ScrapingError>) =
     match result with
     | Error error -> 
-        printfn "[ERROR] Operation failed:"
+        AnsiConsole.MarkupLine("[red][ERROR] Operation failed:[/]")
         match error with
-        | NavigationError msg -> printfn "Navigation Error: %s" msg
-        | ElementNotFound msg -> printfn "Element Not Found: %s" msg
-        | DataExtractionError msg -> printfn "Data Extraction Error: %s" msg
-        | PortfolioCreationError msg -> printfn "Portfolio Creation Error: %s" msg
-        | FileOperationError msg -> printfn "File Operation Error: %s" msg
-        | TimeoutError msg -> printfn "Timeout Error: %s" msg
-        | NetworkError msg -> printfn "Network Error: %s" msg
+        | NavigationError msg -> AnsiConsole.MarkupLine(sprintf "[red]Navigation Error: %s[/]" msg)
+        | ElementNotFound msg -> AnsiConsole.MarkupLine(sprintf "[red]Element Not Found: %s[/]" msg)
+        | DataExtractionError msg -> AnsiConsole.MarkupLine(sprintf "[red]Data Extraction Error: %s[/]" msg)
+        | PortfolioCreationError msg -> AnsiConsole.MarkupLine(sprintf "[red]Portfolio Creation Error: %s[/]" msg)
+        | FileOperationError msg -> AnsiConsole.MarkupLine(sprintf "[red]File Operation Error: %s[/]" msg)
+        | TimeoutError msg -> AnsiConsole.MarkupLine(sprintf "[red]Timeout Error: %s[/]" msg)
+        | NetworkError msg -> AnsiConsole.MarkupLine(sprintf "[red]Network Error: %s[/]" msg)
     | _ -> ()
 
 // Enhanced menu handler with better error handling and new options
@@ -120,29 +123,29 @@ let handleMenuOption (option: MenuOption) : Async<bool> =
         try
             match option with
             | ShowPortfolio ->
-                printfn "\n📊 Loading portfolio data..."
+                AnsiConsole.MarkupLine "\n[blue]📊 Loading portfolio data...[/]"
                 do! showSimpleCurrentPortfolio()
                 return true
                 
             | ImportPortfolio ->
-                printfn "\n📥 Importing portfolio from JSON..."
+                AnsiConsole.MarkupLine "\n[cyan]📥 Importing portfolio from JSON...[/]"
                 do! importCurrentPortfolioFromJson()
                 return true
                 
             | RebalanceIndex ->
-                printfn "\n⚖️  Index Rebalancing"
+                AnsiConsole.MarkupLine "\n[yellow]⚖️  Index Rebalancing[/]"
                 let includeCommission = getCommissionPreference()
                 do! handleRebalancing "index" includeCommission
                 return true
                 
             | RebalanceCurrent ->
-                printfn "\n🔄 Current Portfolio Rebalancing"
+                AnsiConsole.MarkupLine "\n[magenta]🔄 Current Portfolio Rebalancing[/]"
                 let includeCommission = getCommissionPreference()
                 do! handleRebalancing "current" includeCommission
                 return true
                 
             | GetData ->
-                printfn "\n🌐 Fetching market data..."
+                AnsiConsole.MarkupLine "\n[green]🌐 Fetching market data...[/]"
                 let! result = ConstructIndexCache true KSE30
                 printErrors result
                 return true
@@ -153,49 +156,56 @@ let handleMenuOption (option: MenuOption) : Async<bool> =
                 if List.isEmpty stats then
                     printfn "No performance metrics available yet."
                 else
-                    printfn "Recent Performance Metrics:"
+                    let performanceTable = 
+                        Table()
+                            .Title("[bold green]Recent Performance Metrics[/]")
+                            .AddColumns([|"Status"; "Operation"; "Duration"; "Time"|])
+                            .Border(TableBorder.Rounded)
+                            .BorderColor Color.Green
+                    
                     stats 
                     |> List.take 10
                     |> List.iter (fun metric ->
-                        let status = if metric.Success then "✅" else "❌"
-                        printfn "%s %s: %O (%s)" 
-                            status 
-                            metric.OperationName 
-                            metric.Duration 
-                            (metric.Timestamp.ToString("HH:mm:ss")))
+                        let status = if metric.Success then "[green]✅[/]" else "[red]❌[/]"
+                        let operation = metric.OperationName
+                        let duration = metric.Duration.ToString()
+                        let time = metric.Timestamp.ToString("HH:mm:ss")
+                        performanceTable.AddRow(status, operation, duration, time) |> ignore)
+                    
+                    AnsiConsole.Write(performanceTable)
                 return true
                 
             | ClearCache ->
-                printfn "\n🗑️  Cache Management"
+                AnsiConsole.MarkupLine "\n[orange3]🗑️  Cache Management[/]"
                 let confirmed = getConfirmation "Are you sure you want to clear the cache?"
                 if confirmed then
                     cacheManager.Clear()
                     clearOldMetrics 24
-                    printfn "✅ Cache and old metrics cleared successfully!"
+                    AnsiConsole.MarkupLine "[green]✅ Cache and old metrics cleared successfully![/]"
                 else
-                    printfn "❌ Cache clearing cancelled."
+                    AnsiConsole.MarkupLine "[red]❌ Cache clearing cancelled.[/]"
                 return true
                 
             | Exit ->
-                printfn "\n👋 Thank you for using Portfolio Rebalancer!"
+                AnsiConsole.MarkupLine "\n[blue]👋 Thank you for using Portfolio Rebalancer![/]"
                 return false
                 
             | Invalid ->
-                printfn "\n❌ Invalid option. Please select a valid menu option."
+                AnsiConsole.MarkupLine "\n[red]❌ Invalid option. Please select a valid menu option.[/]"
                 return true
         with
         | ex ->
-            printfn "\n💥 An unexpected error occurred: %s" ex.Message
-            printfn "Please try again or contact support if the problem persists."
+            AnsiConsole.MarkupLine(sprintf "\n[red]💥 An unexpected error occurred: %s[/]" ex.Message)
+            AnsiConsole.MarkupLine "[yellow]Please try again or contact support if the problem persists.[/]"
             return true
     }
 
 let main() = async {
     try
-        printfn "🚀 Starting Portfolio Rebalancer..."
-        printfn "📋 Initializing database..."
+        AnsiConsole.MarkupLine "[bold blue]🚀 Starting Portfolio Rebalancer...[/]"
+        AnsiConsole.MarkupLine "[cyan]📋 Initializing database...[/]"
         do! ensureTablesAsync()
-        printfn "✅ Database initialized successfully!"
+        AnsiConsole.MarkupLine "[green]✅ Database initialized successfully![/]"
         
         let rec runMenu () = async {
             try
@@ -207,16 +217,16 @@ let main() = async {
                     do! runMenu()
             with
             | ex ->
-                printfn "\n💥 Menu error: %s" ex.Message
-                printfn "Restarting menu..."
+                AnsiConsole.MarkupLine(sprintf "\n[red]💥 Menu error: %s[/]" ex.Message)
+                AnsiConsole.MarkupLine "[yellow]Restarting menu...[/]"
                 do! runMenu()
         }
         
         do! runMenu()
     with
     | ex ->
-        printfn "\n💥 Fatal error: %s" ex.Message
-        printfn "Application will exit. Please check your configuration and try again."
+        AnsiConsole.MarkupLine(sprintf "\n[red]💥 Fatal error: %s[/]" ex.Message)
+        AnsiConsole.MarkupLine "[red]Application will exit. Please check your configuration and try again.[/]"
         Environment.Exit(1)
 }
 
