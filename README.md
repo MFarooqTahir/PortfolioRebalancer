@@ -14,7 +14,7 @@ A comprehensive F# application for portfolio rebalancing with support for index-
 2. **Build & Run:**
    ```bash
    dotnet build
-   dotnet run
+   dotnet run --project PortfolioRebalancer/
    ```
 
 3. **Get Data & Start:**
@@ -44,21 +44,44 @@ The application follows functional programming principles with clear separation 
 
 ### Core Modules
 
-| Module | Purpose | Key Features |
-|--------|---------|--------------|
-| **Types.fs** | Domain types and data structures | Discriminated unions, Result types, domain models |
-| **Configuration.fs** | Application settings and constants | Environment-aware settings, centralized configuration |
-| **Validation.fs** | Input validation and error handling | Custom validation rules, Result-based error handling |
-| **RebalancingCalculations.fs** | Pure calculation logic | Immutable calculations, functional algorithms |
-| **Rebalancer.fs** | Orchestration and business logic | Result handling, error propagation |
-| **Table.fs** | Display and presentation logic | Rich console output, formatted tables |
-| **Db.fs** | Database operations | Async operations, connection management |
-| **Scraper.fs** | Web scraping functionality | Selenium integration, data extraction |
-| **Helpers.fs** | Utility functions | Common operations, formatting helpers |
-| **Logging.fs** | Logging infrastructure | File-based logging, different log levels |
-| **Performance.fs** | Performance monitoring and caching | In-memory caching, metrics collection |
-| **Extensions.fs** | Extension methods and utilities | Type extensions, utility functions |
-| **Messages.fs** | User-friendly messages | Centralized messaging, localization support |
+**Types.fs** - Domain types and data structures
+- Discriminated unions, Result types, domain models
+
+**Configuration.fs** - Application settings and constants  
+- Environment-aware settings, centralized configuration
+
+**Validation.fs** - Input validation and error handling
+- Custom validation rules, Result-based error handling
+
+**RebalancingCalculations.fs** - Pure calculation logic
+- Immutable calculations, functional algorithms
+
+**Rebalancer.fs** - Orchestration and business logic
+- Result handling, error propagation
+
+**Table.fs** - Display and presentation logic
+- Rich console output, formatted tables
+
+**Db.fs** - Database operations
+- Async operations, connection management
+
+**Scraper.fs** - Web scraping functionality
+- Selenium integration, data extraction
+
+**Helpers.fs** - Utility functions
+- Common operations, formatting helpers
+
+**Logging.fs** - Logging infrastructure
+- File-based logging, different log levels
+
+**Performance.fs** - Performance monitoring and caching
+- In-memory caching, metrics collection
+
+**Extensions.fs** - Extension methods and utilities
+- Type extensions, utility functions
+
+**Messages.fs** - User-friendly messages
+- Centralized messaging, localization support
 
 ### Key Design Principles
 
@@ -128,15 +151,22 @@ docker ps -a | grep portfolio-postgres
    cd PortfolioRebalancer
    ```
 
-2. **Build the project:**
+2. **Build the solution:**
    ```bash
    dotnet build
    ```
 
 3. **Run the application:**
    ```bash
+   # From solution root (recommended)
+   dotnet run --project PortfolioRebalancer/
+   
+   # Or navigate to project directory
+   cd PortfolioRebalancer/
    dotnet run
    ```
+
+**Note:** This is a multi-project solution. The main application is in the `PortfolioRebalancer/` subdirectory, so you need to specify the project when running from the solution root.
 
 ## 🏃‍♂️ Running the Application
 
@@ -165,11 +195,15 @@ dotnet build
 
 #### 3. **Run the Application**
 ```bash
-# Run from project root
+# Run from project root (specify the project)
+dotnet run --project PortfolioRebalancer/
+
+# Or navigate to the project directory first
+cd PortfolioRebalancer/
 dotnet run
 
-# Or run from specific project
-dotnet run --project PortfolioRebalancer/
+# Or run from solution root with explicit project
+dotnet run --project PortfolioRebalancer/PortfolioRebalancer.fsproj
 ```
 
 #### 4. **Using the Application Menu**
@@ -223,19 +257,19 @@ Once the application starts, you'll see an interactive menu:
 
 ```bash
 # Development workflow
-dotnet clean && dotnet build && dotnet run
+dotnet clean && dotnet build && dotnet run --project PortfolioRebalancer/
 
 # Run with specific configuration
-dotnet run --configuration Release
+dotnet run --project PortfolioRebalancer/ --configuration Release
 
 # Run with environment variables
-$env:DATABASE_URL="your-connection-string"; dotnet run
+$env:DATABASE_URL="your-connection-string"; dotnet run --project PortfolioRebalancer/
 
 # Check application version
-dotnet run -- --version
+dotnet run --project PortfolioRebalancer/ -- --version
 
 # Run tests before starting
-dotnet test && dotnet run
+dotnet test && dotnet run --project PortfolioRebalancer/
 ```
 
 ### Troubleshooting
@@ -275,7 +309,7 @@ dotnet add package PackageName
 # Logs are written to the application directory
 
 # Run with verbose output
-dotnet run --verbosity detailed
+dotnet run --project PortfolioRebalancer/ --verbosity detailed
 
 # Check .NET version
 dotnet --version
@@ -302,6 +336,77 @@ dotnet --info
 3. **Monitor Performance:** Use Option 6 to view performance metrics
 4. **Database Optimization:** Ensure PostgreSQL has adequate memory
 
+## 📥 Portfolio Import Documentation
+
+### Overview
+
+The Portfolio Rebalancer supports importing current portfolio data from JSON files. This allows you to work with your actual portfolio holdings for rebalancing calculations.
+
+### Import Process
+
+#### 1. **Prepare Your Portfolio Data**
+
+Create a JSON file with your current portfolio holdings. The file should be named `CurrentPortfolio.json` and placed in the application's working directory.
+
+#### 2. **JSON Format**
+
+Your portfolio JSON file must follow this exact structure:
+
+```json
+[
+    {
+        "Symbol": "BAHL",
+        "Shares": 650,
+        "Price": 157.85
+    },
+    {
+        "Symbol": "DCR", 
+        "Shares": 3518,
+        "Price": 26.33
+    },
+    {
+        "Symbol": "MEBL",
+        "Shares": 500,
+        "Price": 309.89
+    }
+]
+```
+
+#### 3. **Data Fields**
+
+**Symbol** (string)
+- Stock symbol/ticker
+- Example: `"BAHL"`, `"DCR"`
+
+**Shares** (integer)  
+- Number of shares owned
+- Example: `650`, `3518`
+
+**Price** (decimal)
+- Current price per share
+- Example: `157.85`, `26.33`
+
+#### 4. **Import Steps**
+
+1. **Prepare your JSON file:**
+   - Create your portfolio JSON file in the required format
+   - Place it anywhere on your system (you'll provide the path)
+
+2. **Run the application:**
+   ```bash
+   dotnet run --project PortfolioRebalancer/
+   ```
+
+3. **Import the portfolio:**
+   - Choose `Option 2` from the menu
+   - Enter the full path to your JSON file when prompted
+   - The application will read, validate, and import your data
+   - Success message will confirm import with details
+
+4. **Verify the import:**
+   - Choose `Option 1` to view your imported portfolio
+   - Review the data for accuracy
+
 ### Sample Data
 
 The application includes sample data in the `Portfolio Data/` directory:
@@ -309,10 +414,168 @@ The application includes sample data in the `Portfolio Data/` directory:
 - `CurrentPortfolio.json` - Sample portfolio for testing
 - `periodic-details.pdf` - Documentation
 
-To use sample data:
-1. Copy `CurrentPortfolio.json` to your working directory
-2. Use Option 2 to import the portfolio
-3. Use Option 1 to view the imported data
+#### Using Sample Data
+
+```bash
+# Copy sample portfolio to working directory
+cp "Portfolio Data/CurrentPortfolio.json" .
+
+# Run application and import
+dotnet run --project PortfolioRebalancer/
+# Choose Option 2 to import
+```
+
+### Import Validation
+
+The import process includes several validation checks:
+
+- **JSON Format**: Validates proper JSON structure
+- **Data Types**: Ensures correct data types for each field
+- **Required Fields**: Verifies all required fields are present
+- **Database Storage**: Saves validated data to PostgreSQL database
+
+### Error Handling
+
+Common import errors and solutions:
+
+#### **File Not Found**
+```
+[ERROR] File not found: C:\path\to\your\file.json
+Please ensure the file exists and the path is correct.
+```
+**Solution:** Check the file path and ensure the file exists at the specified location
+
+#### **Invalid File Path**
+```
+[ERROR] Directory not found: C:\nonexistent\path\file.json
+Please check the file path and ensure the directory exists.
+```
+**Solution:** Verify the directory path exists and is accessible
+
+#### **Invalid JSON Format**
+```
+[ERROR] Invalid JSON format: Unexpected character at position 15
+Please check the JSON syntax and structure.
+```
+**Solution:** Validate JSON syntax using online tools and check for syntax errors
+
+#### **Missing Fields**
+```
+[ERROR] Could not parse current portfolio JSON.
+Please check the JSON format and ensure it matches the required structure.
+```
+**Solution:** Ensure all records have `Symbol`, `Shares`, and `Price` fields with correct names
+
+#### **Validation Errors**
+```
+[ERROR] Validation errors found:
+  - Record 1: Symbol is empty or null
+  - Record 3: Shares must be greater than 0 (got 0)
+  - Record 5: Price must be greater than 0 (got 0)
+```
+**Solution:** Fix the validation errors shown in the error message
+
+#### **Invalid Data Types**
+```
+[ERROR] Validation errors found:
+  - Record 2: Shares must be greater than 0 (got -5)
+  - Record 4: Price must be greater than 0 (got 0)
+```
+**Solution:** Ensure `Shares` is a positive integer and `Price` is a positive decimal number
+
+### Import Workflow
+
+```mermaid
+graph TD
+    A[Prepare JSON File] --> B[Run Application]
+    B --> C[Choose Option 2]
+    C --> D[Enter File Path]
+    D --> E[Validate File Exists]
+    E --> F{File Exists?}
+    F -->|No| G[Show File Not Found Error]
+    F -->|Yes| H[Read JSON File]
+    H --> I[Parse JSON]
+    I --> J{Valid JSON?}
+    J -->|No| K[Show JSON Error]
+    J -->|Yes| L[Validate Data]
+    L --> M{Data Valid?}
+    M -->|No| N[Show Validation Errors]
+    M -->|Yes| O[Save to Database]
+    O --> P[Show Success Message]
+    G --> Q[Return to Menu]
+    K --> Q
+    N --> Q
+    P --> Q
+```
+
+### Best Practices
+
+1. **Data Accuracy**: Ensure your share counts and prices are current
+2. **Symbol Consistency**: Use the same symbols as your index data
+3. **File Path**: Use full absolute paths or relative paths from the application directory
+4. **Backup**: Keep a backup of your original portfolio data
+5. **Validation**: Always verify imported data using Option 1
+6. **File Permissions**: Ensure the application has read access to your portfolio file
+
+### Advanced Usage
+
+#### **Multiple Portfolio Files**
+
+You can work with different portfolios by providing different file paths:
+
+```bash
+# Import different portfolios
+# When prompted, enter the path to each portfolio file
+# Example paths:
+# C:\Portfolios\portfolio-a.json
+# C:\Portfolios\portfolio-b.json
+# ./data/my-portfolio.json
+```
+
+#### **Automated Import**
+
+For automated workflows, you can script the import process:
+
+```bash
+#!/bin/bash
+# Automated portfolio import script
+PORTFOLIO_FILE="$1"
+echo "Importing portfolio from: $PORTFOLIO_FILE"
+# Note: This would require the application to support non-interactive mode
+# For now, manual import is required
+```
+
+### Troubleshooting Import Issues
+
+#### **File Path Issues**
+- **Problem**: File not found errors
+- **Solution**: Use absolute paths or relative paths from the application directory
+- **Example**: `C:\Users\YourName\Documents\portfolio.json` or `./data/portfolio.json`
+
+#### **Permission Issues**
+- **Problem**: Cannot read file
+- **Solution**: Check file permissions and ensure read access
+- **Windows**: Right-click file → Properties → Security → Edit permissions
+- **Linux/Mac**: Use `chmod 644 filename.json` to set read permissions
+
+#### **Database Issues**
+- **Problem**: Import succeeds but data not saved
+- **Solution**: Check database connection and table structure
+
+#### **Data Validation Issues**
+- **Problem**: Valid JSON but import fails
+- **Solution**: Check data types and field names match exactly
+
+### Integration with Rebalancing
+
+After importing your portfolio:
+
+1. **Get Market Data**: Use Option 5 to fetch current prices
+2. **View Portfolio**: Use Option 1 to verify your holdings
+3. **Rebalance**: Use Option 4 for current portfolio rebalancing
+4. **Compare**: Use Option 3 for index-based rebalancing comparison
+
+The imported portfolio data is automatically used in all rebalancing calculations and will be cached for performance.
 
 ## 🧪 Testing
 
@@ -320,13 +583,20 @@ The project includes a comprehensive test suite with **35 tests** covering all m
 
 ### Test Coverage
 
-| Category | Tests | Description |
-|----------|-------|-------------|
-| **Validation** | 15 | Input validation, error handling, and data integrity |
-| **Helper Functions** | 5 | Utility functions and calculations |
-| **Rebalancing Calculations** | 8 | Core rebalancing logic and edge cases |
-| **Configuration** | 3 | Application settings and constants |
-| **Messages** | 2 | User-facing messages and formatting |
+**Validation** (15 tests)
+- Input validation, error handling, and data integrity
+
+**Helper Functions** (5 tests)  
+- Utility functions and calculations
+
+**Rebalancing Calculations** (8 tests)
+- Core rebalancing logic and edge cases
+
+**Configuration** (3 tests)
+- Application settings and constants
+
+**Messages** (2 tests)
+- User-facing messages and formatting
 
 **Total: 35 tests** covering all critical business logic and edge cases.
 
@@ -478,13 +748,20 @@ The application includes a comprehensive test suite with **35 tests** covering a
 
 ### Test Coverage
 
-| Category | Tests | Coverage |
-|----------|-------|----------|
-| **Validation** | 15 | Input validation, error handling |
-| **Helper Functions** | 5 | Commission, formatting, utilities |
-| **Rebalancing Calculations** | 8 | Core business logic, algorithms |
-| **Configuration** | 3 | Settings and constants validation |
-| **Messages** | 2 | User interface messages |
+**Validation** (15 tests)
+- Input validation, error handling
+
+**Helper Functions** (5 tests)
+- Commission, formatting, utilities
+
+**Rebalancing Calculations** (8 tests)
+- Core business logic, algorithms
+
+**Configuration** (3 tests)
+- Settings and constants validation
+
+**Messages** (2 tests)
+- User interface messages
 
 ### Quick Test Commands
 

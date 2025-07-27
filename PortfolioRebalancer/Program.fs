@@ -129,7 +129,13 @@ let handleMenuOption (option: MenuOption) : Async<bool> =
                 
             | ImportPortfolio ->
                 AnsiConsole.MarkupLine "\n[cyan]📥 Importing portfolio from JSON...[/]"
-                do! importCurrentPortfolioFromJson()
+                printf "Enter the path to your portfolio JSON file: "
+                let filePath = Console.ReadLine().Trim()
+                
+                if System.String.IsNullOrWhiteSpace(filePath) then
+                    AnsiConsole.MarkupLine "[red]❌ No file path provided. Import cancelled.[/]"
+                else
+                    do! importCurrentPortfolioFromJson filePath
                 return true
                 
             | RebalanceIndex ->
