@@ -28,7 +28,6 @@
 		<PackageReference Include="Dapper" Version="2.1.66" />
 		<PackageReference Include="Dapper.FSharp" Version="4.9.0" />
 		<PackageReference Include="FSharp.SystemTextJson" Version="1.4.36" />
-		<PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.7" />
 		<PackageReference Include="Npgsql" Version="9.0.3" />
 		<PackageReference Include="Selenium.Support" Version="4.34.0" />
 		<PackageReference Include="Selenium.WebDriver" Version="4.34.0" />
