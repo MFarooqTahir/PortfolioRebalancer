@@ -2,6 +2,28 @@
 
 A comprehensive F# application for portfolio rebalancing with support for index-based and current portfolio rebalancing strategies. Built with functional programming principles and modern .NET technologies.
 
+## ⚡ Quick Start
+
+**Want to get running immediately?** Follow these steps:
+
+1. **Start Database:**
+   ```bash
+   docker run --name portfolio-postgres -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres1234 -e POSTGRES_DB=portfolio -p 5432:5432 -d postgres
+   ```
+
+2. **Build & Run:**
+   ```bash
+   dotnet build
+   dotnet run
+   ```
+
+3. **Get Data & Start:**
+   - Choose `Option 5` to fetch market data
+   - Choose `Option 1` to view current data
+   - Choose `Option 3` or `Option 4` to rebalance
+
+**For detailed instructions, see [Running the Application](#-running-the-application) below.**
+
 ## 🚀 Features
 
 - **📊 Index Rebalancing**: Rebalance a portfolio based on index weights
@@ -115,6 +137,182 @@ docker ps -a | grep portfolio-postgres
    ```bash
    dotnet run
    ```
+
+## 🏃‍♂️ Running the Application
+
+### Step-by-Step Guide
+
+#### 1. **Start the Database**
+First, ensure your PostgreSQL database is running:
+
+```bash
+# If using Docker (recommended)
+docker start portfolio-postgres
+
+# Verify database is running
+docker ps | grep portfolio-postgres
+```
+
+#### 2. **Build the Application**
+```bash
+# Clean build (recommended for first run)
+dotnet clean
+dotnet build
+
+# Or just build
+dotnet build
+```
+
+#### 3. **Run the Application**
+```bash
+# Run from project root
+dotnet run
+
+# Or run from specific project
+dotnet run --project PortfolioRebalancer/
+```
+
+#### 4. **Using the Application Menu**
+Once the application starts, you'll see an interactive menu:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Portfolio Rebalancer                 │
+├─────────────────────────────────────────────────────────┤
+│ Option │ Description                                    │
+├────────┼────────────────────────────────────────────────┤
+│ 1      │ Show Index and Current Portfolio              │
+│ 2      │ Import Current Portfolio from JSON            │
+│ 3      │ Rebalance Index with Cash                     │
+│ 4      │ Rebalance Current Portfolio with Cash         │
+│ 5      │ Get Index and Stock Data                      │
+│ 6      │ Show Performance Metrics                      │
+│ 7      │ Clear Cache                                   │
+│ 0      │ Exit                                          │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Typical Workflow
+
+1. **First Time Setup:**
+   ```
+   Option 5 → Get Index and Stock Data
+   ```
+   This scrapes current market data and stores it in the database.
+
+2. **Import Portfolio (Optional):**
+   ```
+   Option 2 → Import Current Portfolio from JSON
+   ```
+   Import your current portfolio from a JSON file.
+
+3. **View Current Data:**
+   ```
+   Option 1 → Show Index and Current Portfolio
+   ```
+   Review the current index and portfolio data.
+
+4. **Perform Rebalancing:**
+   ```
+   Option 3 → Rebalance Index with Cash
+   Option 4 → Rebalance Current Portfolio with Cash
+   ```
+   Choose based on your needs.
+
+### Common Commands
+
+```bash
+# Development workflow
+dotnet clean && dotnet build && dotnet run
+
+# Run with specific configuration
+dotnet run --configuration Release
+
+# Run with environment variables
+$env:DATABASE_URL="your-connection-string"; dotnet run
+
+# Check application version
+dotnet run -- --version
+
+# Run tests before starting
+dotnet test && dotnet run
+```
+
+### Troubleshooting
+
+#### Database Connection Issues
+```bash
+# Check if database is running
+docker ps | grep portfolio-postgres
+
+# Check database logs
+docker logs portfolio-postgres
+
+# Test database connection
+docker exec -it portfolio-postgres psql -U postgres -d portfolio -c "SELECT 1;"
+
+# Restart database if needed
+docker restart portfolio-postgres
+```
+
+#### Build Issues
+```bash
+# Clean and rebuild
+dotnet clean
+dotnet restore
+dotnet build
+
+# Check for missing dependencies
+dotnet list package
+
+# Update packages if needed
+dotnet add package PackageName
+```
+
+#### Runtime Issues
+```bash
+# Check application logs
+# Logs are written to the application directory
+
+# Run with verbose output
+dotnet run --verbosity detailed
+
+# Check .NET version
+dotnet --version
+
+# Verify all prerequisites
+dotnet --info
+```
+
+#### Chrome/Selenium Issues
+```bash
+# Ensure Chrome is installed
+# The application will download ChromeDriver automatically
+
+# If ChromeDriver issues occur:
+# 1. Update Chrome browser
+# 2. Clear application cache (Option 7)
+# 3. Restart the application
+```
+
+### Performance Tips
+
+1. **Use Caching:** The application automatically caches database queries
+2. **Clear Cache:** Use Option 7 to clear cache if data seems stale
+3. **Monitor Performance:** Use Option 6 to view performance metrics
+4. **Database Optimization:** Ensure PostgreSQL has adequate memory
+
+### Sample Data
+
+The application includes sample data in the `Portfolio Data/` directory:
+
+- `CurrentPortfolio.json` - Sample portfolio for testing
+- `periodic-details.pdf` - Documentation
+
+To use sample data:
+1. Copy `CurrentPortfolio.json` to your working directory
+2. Use Option 2 to import the portfolio
+3. Use Option 1 to view the imported data
 
 ## 🧪 Testing
 
