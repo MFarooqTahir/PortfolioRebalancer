@@ -12,3 +12,4 @@ alwaysApply: true
 - Dont make mistakes with indentation.
 - Plase use functions in the helpers fle where ever possible.
 - Never use boxing
+- Always use async when possible, never run anything in sync unless it is the only way to do it.

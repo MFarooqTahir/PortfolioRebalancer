@@ -77,7 +77,6 @@ let rebalanceAndDisplay
     (current: CurrentPortfolio list) 
     (prices: StockRecord list) =
     let priceMap = prices |> List.map (fun s -> s.Symbol, s.Price) |> Map.ofList
-    let totalWeight = index |> List.sumBy (fun i -> i.Weight)
     let missingSymbols =
         let indexSymbols = index |> List.map (fun i -> i.Symbol)
         let currentSymbols = current |> List.map (fun c -> c.Symbol)

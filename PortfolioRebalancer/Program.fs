@@ -1,11 +1,10 @@
 ﻿open System
 open Types
-open Helpers
 open Rebalancer
+open Helpers
 open Scraper
 open Table
 open Db
-open Spectre.Console
 open PortfolioImporter
 
 let printErrors (result: Result<unit, ScrapingError>) =
@@ -34,35 +33,34 @@ let main() = async {
         printf "Select an option: "
         match Console.ReadLine() with
         | "1" ->
-            showSimpleCurrentPortfolio () |> Async.RunSynchronously
+            do! showSimpleCurrentPortfolio ()
         | "2" ->
-            importCurrentPortfolioFromJson () |> Async.RunSynchronously
+            do! importCurrentPortfolioFromJson ()
         | "3" ->
             printf "Enter cash amount: "
-            match System.Console.ReadLine() |> System.Decimal.TryParse with
-            | true, cash when cash > 0m ->
+            match Console.ReadLine() with
+            | ValidDecimal cash when cash > 0m ->
                 printf "Include commission? (y/n): "
-                let commissionInput = System.Console.ReadLine()
+                let commissionInput = Console.ReadLine()
                 let includeCommission = commissionInput.Trim().ToLower() = "y"
-                let index = getIndexRecordsAsync () |> Async.RunSynchronously
-                let prices = getStockRecordsAsync () |> Async.RunSynchronously
-                Rebalancer.rebalanceAndDisplay "index" includeCommission cash index [] prices
+                let! index = getIndexRecordsAsync ()
+                let! prices = getStockRecordsAsync ()
+                rebalanceAndDisplay "index" includeCommission cash index [] prices
             | _ -> printfn "Invalid cash amount."
         | "4" ->
             printf "Enter cash amount: "
-            match System.Console.ReadLine() |> System.Decimal.TryParse with
-            | true, cash when cash >= 0m ->
+            match Console.ReadLine() with
+            | ValidDecimal cash when cash >= 0m ->
                 printf "Include commission? (y/n): "
-                let commissionInput = System.Console.ReadLine()
+                let commissionInput = Console.ReadLine()
                 let includeCommission = commissionInput.Trim().ToLower() = "y"
-                let index = getIndexRecordsAsync () |> Async.RunSynchronously
-                let current = getCurrentPortfolioAsync () |> Async.RunSynchronously
-                let prices = getStockRecordsAsync () |> Async.RunSynchronously
-                Rebalancer.rebalanceAndDisplay "current" includeCommission cash index current prices
+                let! index = getIndexRecordsAsync ()
+                let! current = getCurrentPortfolioAsync ()
+                let! prices = getStockRecordsAsync ()
+                rebalanceAndDisplay "current" includeCommission cash index current prices
             | _ -> printfn "Invalid cash amount."
         | "5" ->
-            let url = "https://dps.psx.com.pk/indices"
-            let! result = Scraper.ConstructIndexCache url true
+            let! result = ConstructIndexCache true KSE30
             printErrors result
         | "0" ->
             printfn "Exiting."

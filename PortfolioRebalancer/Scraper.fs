@@ -213,8 +213,8 @@ let updateStockRecordsForSymbols (symbols: string list) = async {
     return ()
 }
 
-let ConstructIndexCache url getLatestStockPrices = async {
-    let indexType = KSE30
+let ConstructIndexCache getLatestStockPrices indexType = async {
+    let url = "https://dps.psx.com.pk/indices"
     let code = 
         match indexType with
             | KSE30 -> "KSE30"
@@ -226,8 +226,8 @@ let ConstructIndexCache url getLatestStockPrices = async {
         | Error err -> return Error err
         | Ok kseData ->
             if getLatestStockPrices then
-                let! currentStocks = Db.getStockRecordsAsync()
-                let! currentPortfolio = Db.getCurrentPortfolioAsync()
+                let! currentStocks = getStockRecordsAsync()
+                let! currentPortfolio = getCurrentPortfolioAsync()
                 let stocksWithData = 
                     kseData 
                         |> List.filter (fun x -> x.Price <> 0m)
@@ -247,7 +247,7 @@ let ConstructIndexCache url getLatestStockPrices = async {
                 let currentPortfolioSymbols = currentPortfolio |> List.map (fun x -> x.Symbol) |> Set.ofList
                 let portfolioOnlySymbols = Set.difference currentPortfolioSymbols indexSymbols |> Set.toList
                 let! kseSymbols = 
-                    (portfolioSymbols @ stocksWithoutData @ portfolioOnlySymbols)
+                    portfolioSymbols @ stocksWithoutData @ portfolioOnlySymbols
                         |> List.distinct
                         |> GetMissingStockPricesAsync driver
                 let allData =
@@ -264,7 +264,7 @@ let ConstructIndexCache url getLatestStockPrices = async {
                 let mergedData = 
                     allData @ currentStocks
                         |> List.distinctBy _.Symbol
-                do! Db.setStockRecordsAsync mergedData
+                do! setStockRecordsAsync mergedData
             let indexData = 
                 kseData 
                     |> List.map (fun x -> 
