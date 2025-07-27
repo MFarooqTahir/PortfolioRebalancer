@@ -1,16 +1,14 @@
 ﻿module Table
 
 open Spectre.Console
-open System.IO
-open System.Text.Json
-open System.Text.Json.Serialization
 open Types
 open Helpers
+open Db
 
 let showSimpleCurrentPortfolio () = async {
-    let! indexRecords = Db.getIndexRecordsAsync()
-    let! stockRecords = Db.getStockRecordsAsync()
-    let! records = Db.getCurrentPortfolioAsync()
+    let! indexRecords = getIndexRecordsAsync()
+    let! stockRecords = getStockRecordsAsync()
+    let! records = getCurrentPortfolioAsync()
     let indexTable =
         Table()
             .Title("=== Index Records ===")
@@ -36,7 +34,7 @@ let showSimpleCurrentPortfolio () = async {
             let cost = decimal s.Shares * s.Price
             let gainLoss = value - cost
             let gainLossPct = if cost <> 0m then gainLoss / cost else 0m
-            (s, currentPrice, value, cost, gainLoss, gainLossPct))
+            s, currentPrice, value, cost, gainLoss, gainLossPct)
         |> List.sortByDescending (fun (_,_,value,_,_,_) -> value)
     match sortedRecords with
     | [] -> table.AddRow("[red]No data[/]", "-", "-", "-", "-", "-", "-") |> ignore
@@ -163,7 +161,6 @@ let showRebalanceCurrentPortfolioResult
     let cashAfterBuying = cashAfterSelling - totalBuyValue - totalBuyCommission
     printfn "Cash after buying: %s" (formatPKR cashAfterBuying)
     if includeCommission then printfn "Total buy commission: %s" (formatPKR totalBuyCommission)
-    let totalValueAll = final |> List.sumBy (fun r -> r.Value)
     let finalTable =
         if includeCommission then
             Table().Title("=== Final Portfolio After Rebalance ===")
