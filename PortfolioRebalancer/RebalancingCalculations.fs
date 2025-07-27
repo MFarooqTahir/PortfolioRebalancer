@@ -2,6 +2,7 @@ module RebalancingCalculations
 
 open Types
 open Helpers
+open Validation
 
 // Helper functions for price and weight mapping
 let createPriceMap (prices: StockRecord list) =
@@ -115,62 +116,68 @@ let calculateFinalPositions (config: RebalanceConfig) (targetSharesMap: Map<stri
         | _ -> None)
 
 // Main rebalancing calculation for current portfolio
-let rebalanceCurrentPortfolio (config: RebalanceConfig) : RebalanceResult =
-    let targetSharesMap = calculateTargetShares config
-    let sells = calculateSellOrders config targetSharesMap
-    let buys = calculateBuyOrders config targetSharesMap
-    let final = calculateFinalPositions config targetSharesMap
-    
-    let totalSellValue = sells |> List.sumBy (fun r -> r.Value)
-    let totalSellCommission = sells |> List.sumBy (fun r -> r.Commission)
-    let cashAfterSelling = config.Cash + totalSellValue - totalSellCommission
-    
-    let totalBuyValue = buys |> List.sumBy (fun r -> r.Value)
-    let totalBuyCommission = buys |> List.sumBy (fun r -> r.Commission)
-    let cashAfterBuying = cashAfterSelling - totalBuyValue - totalBuyCommission
-    
-    { 
-        Sells = sells
-        Buys = buys
-        Final = final
-        CashAfterSelling = cashAfterSelling
-        CashAfterBuying = cashAfterBuying
-        TotalSellValue = totalSellValue
-        TotalBuyValue = totalBuyValue
-        TotalSellCommission = totalSellCommission
-        TotalBuyCommission = totalBuyCommission
+let rebalanceCurrentPortfolio (config: RebalanceConfig) : Result<RebalanceResult, ValidationError> =
+    result {
+        let! validatedConfig = validateRebalanceConfig config
+        let targetSharesMap = calculateTargetShares config
+        let sells = calculateSellOrders config targetSharesMap
+        let buys = calculateBuyOrders config targetSharesMap
+        let final = calculateFinalPositions config targetSharesMap
+        
+        let totalSellValue = sells |> List.sumBy (fun r -> r.Value)
+        let totalSellCommission = sells |> List.sumBy (fun r -> r.Commission)
+        let cashAfterSelling = config.Cash + totalSellValue - totalSellCommission
+        
+        let totalBuyValue = buys |> List.sumBy (fun r -> r.Value)
+        let totalBuyCommission = buys |> List.sumBy (fun r -> r.Commission)
+        let cashAfterBuying = cashAfterSelling - totalBuyValue - totalBuyCommission
+        
+        return { 
+            Sells = sells
+            Buys = buys
+            Final = final
+            CashAfterSelling = cashAfterSelling
+            CashAfterBuying = cashAfterBuying
+            TotalSellValue = totalSellValue
+            TotalBuyValue = totalBuyValue
+            TotalSellCommission = totalSellCommission
+            TotalBuyCommission = totalBuyCommission
+        }
     }
 
 // Rebalancing calculation for index (no current portfolio)
-let rebalanceIndex (config: RebalanceConfig) : IndexRebalanceResult =
-    let priceMap = createPriceMap config.Prices
-    let totalWeight = config.Index |> List.sumBy (fun i -> i.Weight)
-    
-    let orders = 
-        config.Index
-        |> List.choose (fun idx ->
-            match Map.tryFind idx.Symbol priceMap with
-            | Some price when price > 0m ->
-                let targetValue = config.Cash * (idx.Weight / totalWeight)
-                let shares = int (targetValue / price)
-                let value = decimal shares * price
-                let commission = if config.IncludeCommission then calculateCommission price shares else 0m
-                Some { 
-                    Symbol = idx.Symbol
-                    Shares = shares
-                    Price = price
-                    Value = value
-                    Commission = commission
-                }
-            | _ -> None)
-    
-    let totalValue = orders |> List.sumBy (fun r -> r.Value)
-    let totalCommission = orders |> List.sumBy (fun r -> r.Commission)
-    let remainingCash = config.Cash - totalValue - totalCommission
-    
-    { 
-        Orders = orders
-        TotalValue = totalValue
-        TotalCommission = totalCommission
-        RemainingCash = remainingCash
+let rebalanceIndex (config: RebalanceConfig) : Result<IndexRebalanceResult, ValidationError> =
+    result {
+        let! validatedConfig = validateRebalanceConfig config
+        let priceMap = createPriceMap config.Prices
+        let totalWeight = config.Index |> List.sumBy (fun i -> i.Weight)
+        
+        let orders = 
+            config.Index
+            |> List.choose (fun idx ->
+                match Map.tryFind idx.Symbol priceMap with
+                | Some price when price > 0m ->
+                    let targetValue = config.Cash * (idx.Weight / totalWeight)
+                    let shares = int (targetValue / price)
+                    let value = decimal shares * price
+                    let commission = if config.IncludeCommission then calculateCommission price shares else 0m
+                    Some { 
+                        Symbol = idx.Symbol
+                        Shares = shares
+                        Price = price
+                        Value = value
+                        Commission = commission
+                    }
+                | _ -> None)
+        
+        let totalValue = orders |> List.sumBy (fun r -> r.Value)
+        let totalCommission = orders |> List.sumBy (fun r -> r.Commission)
+        let remainingCash = config.Cash - totalValue - totalCommission
+        
+        return { 
+            Orders = orders
+            TotalValue = totalValue
+            TotalCommission = totalCommission
+            RemainingCash = remainingCash
+        }
     } 

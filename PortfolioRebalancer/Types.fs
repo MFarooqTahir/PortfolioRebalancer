@@ -7,6 +7,14 @@ type ScrapingError =
     | PortfolioCreationError of string
     | FileOperationError of string
 
+type ValidationError =
+    | InvalidCashAmount of decimal
+    | InvalidSymbol of string
+    | MissingPriceData of string list
+    | EmptyIndex
+    | EmptyPortfolio
+    | InsufficientData of string
+
 [<CLIMutable>]
 type IndexTableRecord = {
     Symbol: string
@@ -80,3 +88,20 @@ type RebalanceConfig = {
     Current: CurrentPortfolio list
     Prices: StockRecord list
 }
+
+// Validation types
+type ValidatedRebalanceConfig = {
+    IncludeCommission: bool
+    Cash: decimal
+    Index: IndexTableRecord list
+    Current: CurrentPortfolio list
+    Prices: StockRecord list
+    MissingSymbols: string list
+}
+
+// Domain types for better semantics
+type Symbol = Symbol of string
+type CashAmount = CashAmount of decimal
+type ShareCount = ShareCount of int
+type Price = Price of decimal
+type Weight = Weight of decimal

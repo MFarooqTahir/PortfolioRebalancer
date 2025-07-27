@@ -14,8 +14,9 @@ let rebalanceIndexWithCash (index: IndexTableRecord list) (prices: StockRecord l
         Current = []
         Prices = prices
     }
-    let result = rebalanceIndex config
-    result.Orders
+    match rebalanceIndex config with
+    | Ok result -> result.Orders
+    | Error _ -> []
 
 let rebalanceCurrentPortfolioWithCash (index: IndexTableRecord list) (current: CurrentPortfolio list) (prices: StockRecord list) (cash: decimal) =
     let config = { 
@@ -25,8 +26,9 @@ let rebalanceCurrentPortfolioWithCash (index: IndexTableRecord list) (current: C
         Current = current
         Prices = prices
     }
-    let result = rebalanceCurrentPortfolio config
-    result.Buys
+    match rebalanceCurrentPortfolio config with
+    | Ok result -> result.Buys
+    | Error _ -> []
 
 let getRebalanceIndexPlan (index: IndexTableRecord list) (prices: StockRecord list) (cash: decimal) =
     let config = { 
@@ -36,8 +38,9 @@ let getRebalanceIndexPlan (index: IndexTableRecord list) (prices: StockRecord li
         Current = []
         Prices = prices
     }
-    let result = rebalanceIndex config
-    result.Orders |> List.map (fun order -> (order.Symbol, 0m, order.Price, order.Shares, order.Value))
+    match rebalanceIndex config with
+    | Ok result -> result.Orders |> List.map (fun order -> (order.Symbol, 0m, order.Price, order.Shares, order.Value))
+    | Error _ -> []
 
 let getRebalanceCurrentPortfolioPlan (index: IndexTableRecord list) (current: CurrentPortfolio list) (prices: StockRecord list) (cash: decimal) =
     let config = { 
@@ -47,8 +50,9 @@ let getRebalanceCurrentPortfolioPlan (index: IndexTableRecord list) (current: Cu
         Current = current
         Prices = prices
     }
-    let result = rebalanceCurrentPortfolio config
-    result.Buys |> List.map (fun order -> (order.Symbol, 0m, order.Price, 0, order.Shares, order.Value))
+    match rebalanceCurrentPortfolio config with
+    | Ok result -> result.Buys |> List.map (fun order -> (order.Symbol, 0m, order.Price, 0, order.Shares, order.Value))
+    | Error _ -> []
 
 // Main rebalancing function with improved structure
 let rebalanceAndDisplay 
@@ -88,44 +92,50 @@ let rebalanceAndDisplay
         }
         
         if kind = "index" then
-            let result = rebalanceIndex config
-            let weightMap = createWeightMap index
-            let displayOrders = result.Orders |> List.map (fun order -> 
-                {| 
-                    Symbol = order.Symbol
-                    Shares = order.Shares
-                    Value = order.Value
-                    Commission = order.Commission
-                    Price = order.Price
-                    Weight = Map.tryFind order.Symbol weightMap |> Option.defaultValue 0m
-                |})
-            showRebalanceIndexResult displayOrders includeCommission cash
+            match rebalanceIndex config with
+            | Ok result ->
+                let weightMap = createWeightMap index
+                let displayOrders = result.Orders |> List.map (fun order -> 
+                    {| 
+                        Symbol = order.Symbol
+                        Shares = order.Shares
+                        Value = order.Value
+                        Commission = order.Commission
+                        Price = order.Price
+                        Weight = Map.tryFind order.Symbol weightMap |> Option.defaultValue 0m
+                    |})
+                showRebalanceIndexResult displayOrders includeCommission cash
+            | Error _ -> 
+                printfn "[ERROR] Failed to rebalance index."
         else
-            let result = rebalanceCurrentPortfolio config
-            let displaySells = result.Sells |> List.map (fun order -> 
-                {| 
-                    Symbol = order.Symbol
-                    Shares = order.Shares
-                    Price = order.Price
-                    Value = order.Value
-                    Commission = order.Commission
-                |})
-            let displayBuys = result.Buys |> List.map (fun order -> 
-                {| 
-                    Symbol = order.Symbol
-                    Shares = order.Shares
-                    Price = order.Price
-                    Value = order.Value
-                    Commission = order.Commission
-                |})
-            let displayFinal = result.Final |> List.map (fun pos -> 
-                {| 
-                    Symbol = pos.Symbol
-                    Shares = pos.Shares
-                    Value = pos.Value
-                    Commission = pos.Commission
-                    Price = pos.Price
-                    Weight = pos.Weight
-                    FinalWeight = pos.FinalWeight
-                |})
-            showRebalanceCurrentPortfolioResult displaySells displayBuys displayFinal includeCommission cash
+            match rebalanceCurrentPortfolio config with
+            | Ok result ->
+                let displaySells = result.Sells |> List.map (fun order -> 
+                    {| 
+                        Symbol = order.Symbol
+                        Shares = order.Shares
+                        Price = order.Price
+                        Value = order.Value
+                        Commission = order.Commission
+                    |})
+                let displayBuys = result.Buys |> List.map (fun order -> 
+                    {| 
+                        Symbol = order.Symbol
+                        Shares = order.Shares
+                        Price = order.Price
+                        Value = order.Value
+                        Commission = order.Commission
+                    |})
+                let displayFinal = result.Final |> List.map (fun pos -> 
+                    {| 
+                        Symbol = pos.Symbol
+                        Shares = pos.Shares
+                        Value = pos.Value
+                        Commission = pos.Commission
+                        Price = pos.Price
+                        Weight = pos.Weight
+                        FinalWeight = pos.FinalWeight
+                    |})
+                showRebalanceCurrentPortfolioResult displaySells displayBuys displayFinal includeCommission cash
+            | Error _ -> 
+                printfn "[ERROR] Failed to rebalance current portfolio."

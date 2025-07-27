@@ -7,7 +7,12 @@
 
 	<ItemGroup>
 		<Compile Include="Types.fs" />
+		<Compile Include="Configuration.fs" />
 		<Compile Include="Helpers.fs" />
+		<Compile Include="Validation.fs" />
+		<Compile Include="Logging.fs" />
+		<Compile Include="Performance.fs" />
+		<Compile Include="Extensions.fs" />
 		<Compile Include="Db.fs" />
 		<Compile Include="Scraper.fs" />
 		<Compile Include="Table.fs" />

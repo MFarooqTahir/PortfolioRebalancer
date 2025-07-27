@@ -3,6 +3,7 @@
 open System.Globalization
 open System
 open Types
+open Configuration
 
 let indianCulture = CultureInfo "hi-IN"
 do
@@ -28,8 +29,8 @@ let (|ValidWeight|_|) (str: string) =
     | true, weight when weight > 0m -> Some (weight / 100m)
     | _ -> None
 
-let ToWeightMap (indexRecord: IndexTableRecord list) =
-    indexRecord
+let createWeightMap (indexRecords: IndexTableRecord list) =
+    indexRecords
         |> List.map(fun x -> x.Symbol, x.Weight)
         |> Map.ofList
 
@@ -40,23 +41,22 @@ type StockDisplayTableRecord = {
     Price: decimal
 }
 
-let ToStockTableRecord indexRecords (individualStockData: StockRecord list)=
-    let weightMap = indexRecords |> ToWeightMap
+let createStockTableRecord (indexRecords: IndexTableRecord list) (individualStockData: StockRecord list) =
+    let weightMap = indexRecords |> createWeightMap
 
     individualStockData 
         |> List.choose (fun stock -> 
-            let weight = weightMap |> Map.tryFind stock.Symbol
-            match weight with
-                | None -> None
-                | Some d -> Some {
-                        Weight = d
-                        Symbol = stock.Symbol
-                        Name = stock.Name
-                        Price = stock.Price
-                    })
+            weightMap 
+            |> Map.tryFind stock.Symbol
+            |> Option.map (fun weight -> {
+                Weight = weight
+                Symbol = stock.Symbol
+                Name = stock.Name
+                Price = stock.Price
+            }))
 
 let calculateCommission sharePrice quantity =
-    if sharePrice < 12m then
-        0.03m * decimal quantity
+    if sharePrice < Commission.MinimumPrice then
+        Commission.FixedRate * decimal quantity
     else
-        sharePrice * decimal quantity * 0.0025m
+        sharePrice * decimal quantity * Commission.PercentageRate
