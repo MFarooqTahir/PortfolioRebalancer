@@ -39,6 +39,8 @@ let calculateTargetShares (config: RebalanceConfig) =
         | _ -> None)
     |> Map.ofList
 
+
+
 // Calculate sell orders
 let calculateSellOrders (config: RebalanceConfig) (targetSharesMap: Map<string, int>) =
     let priceMap = createPriceMap config.Prices
@@ -152,32 +154,42 @@ let rebalanceIndex (config: RebalanceConfig) : Result<IndexRebalanceResult, Vali
         let priceMap = createPriceMap config.Prices
         let totalWeight = config.Index |> List.sumBy (fun i -> i.Weight)
         
-        let orders = 
-            config.Index
-            |> List.choose (fun idx ->
-                match Map.tryFind idx.Symbol priceMap with
-                | Some price when price > 0m ->
-                    let targetValue = config.Cash * (idx.Weight / totalWeight)
-                    let shares = int (targetValue / price)
-                    let value = decimal shares * price
-                    let commission = if config.IncludeCommission then calculateCommission price shares else 0m
-                    Some { 
-                        Symbol = idx.Symbol
-                        Shares = shares
-                        Price = price
-                        Value = value
-                        Commission = commission
-                    }
-                | _ -> None)
-        
-        let totalValue = orders |> List.sumBy (fun r -> r.Value)
-        let totalCommission = orders |> List.sumBy (fun r -> r.Commission)
-        let remainingCash = config.Cash - totalValue - totalCommission
-        
-        return { 
-            Orders = orders
-            TotalValue = totalValue
-            TotalCommission = totalCommission
-            RemainingCash = remainingCash
-        }
+        // Handle edge cases: zero cash or zero total weight
+        if config.Cash = 0m || totalWeight = 0m then
+            return { 
+                Orders = []
+                TotalValue = 0m
+                TotalCommission = 0m
+                RemainingCash = config.Cash
+            }
+        else
+            let orders = 
+                config.Index
+                |> List.choose (fun idx ->
+                    match Map.tryFind idx.Symbol priceMap with
+                    | Some price when price > 0m ->
+                        let normalizedWeight = idx.Weight / totalWeight
+                        let targetValue = config.Cash * normalizedWeight
+                        let shares = int (targetValue / price)
+                        let value = decimal shares * price
+                        let commission = if config.IncludeCommission then calculateCommission price shares else 0m
+                        Some { 
+                            Symbol = idx.Symbol
+                            Shares = shares
+                            Price = price
+                            Value = value
+                            Commission = commission
+                        }
+                    | _ -> None)
+            
+            let totalValue = orders |> List.sumBy (fun r -> r.Value)
+            let totalCommission = orders |> List.sumBy (fun r -> r.Commission)
+            let remainingCash = config.Cash - totalValue - totalCommission
+            
+            return { 
+                Orders = orders
+                TotalValue = totalValue
+                TotalCommission = totalCommission
+                RemainingCash = remainingCash
+            }
     } 

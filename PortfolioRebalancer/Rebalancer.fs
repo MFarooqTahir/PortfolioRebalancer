@@ -6,8 +6,6 @@ open Table
 open RebalancingCalculations
 open Spectre.Console
 
-
-
 // Main rebalancing function with improved structure
 let rebalanceAndDisplay 
     (kind: string) 
@@ -30,17 +28,19 @@ let rebalanceAndDisplay
     let validateInputs () =
         let missingSymbols = findMissingSymbols()
         
+        // Show warning for missing symbols but continue
         if not (List.isEmpty missingSymbols) then
             AnsiConsole.MarkupLine(sprintf "[yellow][WARNING] No price data for: %s[/]" (String.concat ", " missingSymbols))
         
+        // Check for required data
         if List.isEmpty index then
-            AnsiConsole.MarkupLine("[red][ERROR] No index records found.[/]")
+            AnsiConsole.MarkupLine "[red][ERROR] No index records found.[/]"
             false
         elif List.isEmpty prices then
-            AnsiConsole.MarkupLine("[red][ERROR] No stock price records found.[/]")
+            AnsiConsole.MarkupLine "[red][ERROR] No stock price records found.[/]"
             false
         elif kind = "current" && List.isEmpty current then
-            AnsiConsole.MarkupLine("[red][ERROR] No current portfolio records found.[/]")
+            AnsiConsole.MarkupLine "[red][ERROR] No current portfolio records found.[/]"
             false
         else
             true
@@ -68,7 +68,7 @@ let rebalanceAndDisplay
                 |})
             showRebalanceIndexResult displayOrders includeCommission cash
         | Error _ -> 
-            AnsiConsole.MarkupLine("[red][ERROR] Failed to rebalance index.[/]")
+            AnsiConsole.MarkupLine "[red][ERROR] Failed to rebalance index.[/]"
     
     let handleCurrentPortfolioRebalancing config =
         match rebalanceCurrentPortfolio config with
@@ -101,7 +101,7 @@ let rebalanceAndDisplay
                 |})
             showRebalanceCurrentPortfolioResult displaySells displayBuys displayFinal includeCommission cash
         | Error _ -> 
-            AnsiConsole.MarkupLine("[red][ERROR] Failed to rebalance current portfolio.[/]")
+            AnsiConsole.MarkupLine "[red][ERROR] Failed to rebalance current portfolio.[/]"
     
     // Main execution flow
     if validateInputs() then

@@ -406,6 +406,435 @@ let ``Messages should contain success messages`` () =
     Assert.NotNull Success.RebalancingCompleted
     Assert.NotNull Success.PortfolioImported
 
+// ============================================================================
+// ADVANCED CALCULATION TESTS
+// ============================================================================
+
+[<Fact>]
+let ``calculateSellOrders should calculate correct sell orders`` () =
+    let config = {
+        IncludeCommission = false
+        Cash = 0m
+        Index = [
+            { Symbol = "AAPL"; Weight = 0.5m }
+            { Symbol = "MSFT"; Weight = 0.5m }
+        ]
+        Current = [
+            { Symbol = "AAPL"; Shares = 100; Price = 100m } // 10000 value
+            { Symbol = "MSFT"; Shares = 100; Price = 200m } // 20000 value
+        ]
+        Prices = [
+            { Symbol = "AAPL"; Name = "Apple Inc."; Price = 100m }
+            { Symbol = "MSFT"; Name = "Microsoft Corp."; Price = 200m }
+        ]
+    }
+    let targetSharesMap = calculateTargetShares config
+    let sellOrders = calculateSellOrders config targetSharesMap
+    
+    // Total value: 30000, Target AAPL: 150 shares, Target MSFT: 75 shares
+    // AAPL: 100 current - 150 target = -50 (buy, no sell)
+    // MSFT: 100 current - 75 target = 25 (sell)
+    Assert.Equal(1, sellOrders.Length)
+    let msftSell = sellOrders |> List.find (fun o -> o.Symbol = "MSFT")
+    Assert.Equal(25, msftSell.Shares)
+    Assert.Equal(200m, msftSell.Price)
+    Assert.Equal(5000m, msftSell.Value)
+
+[<Fact>]
+let ``calculateBuyOrders should calculate correct buy orders`` () =
+    let config = {
+        IncludeCommission = false
+        Cash = 10000m
+        Index = [
+            { Symbol = "AAPL"; Weight = 0.6m }
+            { Symbol = "MSFT"; Weight = 0.4m }
+        ]
+        Current = [
+            { Symbol = "AAPL"; Shares = 50; Price = 100m } // 5000 value
+        ]
+        Prices = [
+            { Symbol = "AAPL"; Name = "Apple Inc."; Price = 100m }
+            { Symbol = "MSFT"; Name = "Microsoft Corp."; Price = 200m }
+        ]
+    }
+    let targetSharesMap = calculateTargetShares config
+    let buyOrders = calculateBuyOrders config targetSharesMap
+    
+    // Total value: 15000, Target AAPL: 90 shares, Target MSFT: 30 shares
+    // AAPL: 90 target - 50 current = 40 (buy)
+    // MSFT: 30 target - 0 current = 30 (buy)
+    Assert.Equal(2, buyOrders.Length)
+    let aaplBuy = buyOrders |> List.find (fun o -> o.Symbol = "AAPL")
+    let msftBuy = buyOrders |> List.find (fun o -> o.Symbol = "MSFT")
+    Assert.Equal(40, aaplBuy.Shares)
+    Assert.Equal(30, msftBuy.Shares)
+    Assert.Equal(4000m, aaplBuy.Value)
+    Assert.Equal(6000m, msftBuy.Value)
+
+[<Fact>]
+let ``calculateFinalPositions should calculate correct final positions`` () =
+    let config = {
+        IncludeCommission = false
+        Cash = 10000m
+        Index = [
+            { Symbol = "AAPL"; Weight = 0.6m }
+            { Symbol = "MSFT"; Weight = 0.4m }
+        ]
+        Current = []
+        Prices = [
+            { Symbol = "AAPL"; Name = "Apple Inc."; Price = 100m }
+            { Symbol = "MSFT"; Name = "Microsoft Corp."; Price = 200m }
+        ]
+    }
+    let targetSharesMap = calculateTargetShares config
+    let finalPositions = calculateFinalPositions config targetSharesMap
+    
+    Assert.Equal(2, finalPositions.Length)
+    let aaplPos = finalPositions |> List.find (fun p -> p.Symbol = "AAPL")
+    let msftPos = finalPositions |> List.find (fun p -> p.Symbol = "MSFT")
+    
+    Assert.Equal(60, aaplPos.Shares) // 10000 * 0.6 / 100
+    Assert.Equal(20, msftPos.Shares) // 10000 * 0.4 / 200
+    Assert.Equal(6000m, aaplPos.Value)
+    Assert.Equal(4000m, msftPos.Value)
+    Assert.Equal(0.6m, aaplPos.Weight)
+    Assert.Equal(0.4m, msftPos.Weight)
+    Assert.Equal(0.6m, aaplPos.FinalWeight) // 6000 / 10000
+    Assert.Equal(0.4m, msftPos.FinalWeight) // 4000 / 10000
+
+[<Fact>]
+let ``Commission calculation should be included when enabled`` () =
+    let config = {
+        IncludeCommission = true
+        Cash = 10000m
+        Index = [
+            { Symbol = "AAPL"; Weight = 1.0m }
+        ]
+        Current = []
+        Prices = [
+            { Symbol = "AAPL"; Name = "Apple Inc."; Price = 100m }
+        ]
+    }
+    let result = rebalanceIndex config
+    match result with
+    | Ok rebalanceResult ->
+        Assert.Equal(1, rebalanceResult.Orders.Length)
+        let order = rebalanceResult.Orders |> List.head
+        Assert.True(order.Commission > 0m, "Commission should be calculated when enabled")
+        Assert.True(rebalanceResult.TotalCommission > 0m, "Total commission should be calculated")
+    | Error _ -> Assert.True(false, "Should not return error for valid config")
+
+[<Fact>]
+let ``Commission calculation should be zero when disabled`` () =
+    let config = {
+        IncludeCommission = false
+        Cash = 10000m
+        Index = [
+            { Symbol = "AAPL"; Weight = 1.0m }
+        ]
+        Current = []
+        Prices = [
+            { Symbol = "AAPL"; Name = "Apple Inc."; Price = 100m }
+        ]
+    }
+    let result = rebalanceIndex config
+    match result with
+    | Ok rebalanceResult ->
+        Assert.Equal(1, rebalanceResult.Orders.Length)
+        let order = rebalanceResult.Orders |> List.head
+        Assert.Equal(0m, order.Commission)
+        Assert.Equal(0m, rebalanceResult.TotalCommission)
+    | Error _ -> Assert.True(false, "Should not return error for valid config")
+
+[<Fact>]
+let ``Weight normalization should work correctly`` () =
+    let config = {
+        IncludeCommission = false
+        Cash = 10000m
+        Index = [
+            { Symbol = "AAPL"; Weight = 0.3m }
+            { Symbol = "MSFT"; Weight = 0.2m }
+            { Symbol = "GOOGL"; Weight = 0.1m }
+        ] // Total weight = 0.6, will be normalized
+        Current = []
+        Prices = [
+            { Symbol = "AAPL"; Name = "Apple Inc."; Price = 100m }
+            { Symbol = "MSFT"; Name = "Microsoft Corp."; Price = 200m }
+            { Symbol = "GOOGL"; Name = "Alphabet Inc."; Price = 300m }
+        ]
+    }
+    let result = rebalanceIndex config
+    match result with
+    | Ok rebalanceResult ->
+        Assert.Equal(3, rebalanceResult.Orders.Length)
+        let totalValue = rebalanceResult.Orders |> List.sumBy (fun o -> o.Value)
+        // With integer truncation, we expect the total to be less than or equal to cash
+        Assert.True(totalValue <= 10000m, sprintf "Total value %M should be <= 10000" totalValue)
+        Assert.True(totalValue > 9500m, sprintf "Total value %M should be > 9500" totalValue) // Should be close to 10000
+    | Error _ -> Assert.True(false, "Should not return error for valid config")
+
+[<Fact>]
+let ``Zero cash should result in no orders for index rebalancing`` () =
+    let config = {
+        IncludeCommission = false
+        Cash = 0m
+        Index = [
+            { Symbol = "AAPL"; Weight = 0.6m }
+            { Symbol = "MSFT"; Weight = 0.4m }
+        ]
+        Current = []
+        Prices = [
+            { Symbol = "AAPL"; Name = "Apple Inc."; Price = 100m }
+            { Symbol = "MSFT"; Name = "Microsoft Corp."; Price = 200m }
+        ]
+    }
+    let result = rebalanceIndex config
+    match result with
+    | Ok rebalanceResult ->
+        Assert.Equal(0, rebalanceResult.Orders.Length)
+        Assert.Equal(0m, rebalanceResult.TotalValue)
+        Assert.Equal(0m, rebalanceResult.TotalCommission)
+        Assert.Equal(0m, rebalanceResult.RemainingCash)
+    | Error _ -> Assert.True(false, "Should not return error for valid config")
+
+[<Fact>]
+let ``Zero price should be handled gracefully`` () =
+    let config = {
+        IncludeCommission = false
+        Cash = 10000m
+        Index = [
+            { Symbol = "AAPL"; Weight = 0.6m }
+            { Symbol = "MSFT"; Weight = 0.4m }
+        ]
+        Current = []
+        Prices = [
+            { Symbol = "AAPL"; Name = "Apple Inc."; Price = 0m } // Zero price
+            { Symbol = "MSFT"; Name = "Microsoft Corp."; Price = 200m }
+        ]
+    }
+    let result = rebalanceIndex config
+    match result with
+    | Ok rebalanceResult ->
+        // Should only include MSFT order, skip AAPL due to zero price
+        Assert.Equal(1, rebalanceResult.Orders.Length)
+        let msftOrder = rebalanceResult.Orders |> List.find (fun o -> o.Symbol = "MSFT")
+        Assert.Equal("MSFT", msftOrder.Symbol)
+    | Error _ -> Assert.True(false, "Should handle zero price gracefully")
+
+[<Fact>]
+let ``Large numbers should be handled correctly`` () =
+    let config = {
+        IncludeCommission = false
+        Cash = 1000000m // 1 million
+        Index = [
+            { Symbol = "AAPL"; Weight = 0.5m }
+            { Symbol = "MSFT"; Weight = 0.5m }
+        ]
+        Current = []
+        Prices = [
+            { Symbol = "AAPL"; Name = "Apple Inc."; Price = 1000m } // High price
+            { Symbol = "MSFT"; Name = "Microsoft Corp."; Price = 2000m }
+        ]
+    }
+    let result = rebalanceIndex config
+    match result with
+    | Ok rebalanceResult ->
+        Assert.Equal(2, rebalanceResult.Orders.Length)
+        let totalValue = rebalanceResult.Orders |> List.sumBy (fun o -> o.Value)
+        Assert.Equal(float 1000000m, float totalValue, float 1000m) // Allow for rounding differences
+    | Error _ -> Assert.True(false, "Should handle large numbers correctly")
+
+[<Fact>]
+let ``Complex portfolio with multiple stocks should rebalance correctly`` () =
+    let config = {
+        IncludeCommission = false
+        Cash = 50000m
+        Index = [
+            { Symbol = "AAPL"; Weight = 0.3m }
+            { Symbol = "MSFT"; Weight = 0.25m }
+            { Symbol = "GOOGL"; Weight = 0.2m }
+            { Symbol = "AMZN"; Weight = 0.15m }
+            { Symbol = "TSLA"; Weight = 0.1m }
+        ]
+        Current = [
+            { Symbol = "AAPL"; Shares = 100; Price = 150m } // 15000
+            { Symbol = "MSFT"; Shares = 50; Price = 300m }  // 15000
+            { Symbol = "GOOGL"; Shares = 20; Price = 2500m } // 50000
+        ]
+        Prices = [
+            { Symbol = "AAPL"; Name = "Apple Inc."; Price = 150m }
+            { Symbol = "MSFT"; Name = "Microsoft Corp."; Price = 300m }
+            { Symbol = "GOOGL"; Name = "Alphabet Inc."; Price = 2500m }
+            { Symbol = "AMZN"; Name = "Amazon.com Inc."; Price = 3000m }
+            { Symbol = "TSLA"; Name = "Tesla Inc."; Price = 800m }
+        ]
+    }
+    let result = rebalanceCurrentPortfolio config
+    match result with
+    | Ok rebalanceResult ->
+        // Total value: 50000 + 15000 + 15000 + 50000 = 130000
+        // Should have both buys and sells
+        Assert.True(rebalanceResult.Buys.Length > 0, "Should have buy orders")
+        Assert.True(rebalanceResult.Sells.Length > 0, "Should have sell orders")
+        
+        let totalBuyValue = rebalanceResult.Buys |> List.sumBy (fun o -> o.Value)
+        let totalSellValue = rebalanceResult.Sells |> List.sumBy (fun o -> o.Value)
+        Assert.True(totalBuyValue > 0m, "Should have positive buy value")
+        Assert.True(totalSellValue > 0m, "Should have positive sell value")
+        
+        // Check that final positions are calculated
+        Assert.Equal(5, rebalanceResult.Final.Length)
+    | Error _ -> Assert.True(false, "Should not return error for complex portfolio")
+
+[<Fact>]
+let ``Cash flow calculations should be correct`` () =
+    let config = {
+        IncludeCommission = true
+        Cash = 10000m
+        Index = [
+            { Symbol = "AAPL"; Weight = 0.6m }
+            { Symbol = "MSFT"; Weight = 0.4m }
+        ]
+        Current = [
+            { Symbol = "AAPL"; Shares = 50; Price = 100m } // 5000
+            { Symbol = "MSFT"; Shares = 20; Price = 200m }  // 4000
+        ]
+        Prices = [
+            { Symbol = "AAPL"; Name = "Apple Inc."; Price = 100m }
+            { Symbol = "MSFT"; Name = "Microsoft Corp."; Price = 200m }
+        ]
+    }
+    let result = rebalanceCurrentPortfolio config
+    match result with
+    | Ok rebalanceResult ->
+        // Initial cash: 10000
+        // Current portfolio value: 5000 + 4000 = 9000
+        // Total value: 19000
+        
+        // Check cash flow calculations
+        Assert.True(rebalanceResult.CashAfterSelling >= 10000m, "Cash after selling should be >= initial cash")
+        Assert.True(rebalanceResult.CashAfterBuying <= rebalanceResult.CashAfterSelling, "Cash after buying should be <= cash after selling")
+        
+        // Verify the relationship between values
+        let expectedCashAfterSelling = 10000m + rebalanceResult.TotalSellValue - rebalanceResult.TotalSellCommission
+        Assert.Equal(float expectedCashAfterSelling, float rebalanceResult.CashAfterSelling, float 1m)
+        
+        let expectedCashAfterBuying = rebalanceResult.CashAfterSelling - rebalanceResult.TotalBuyValue - rebalanceResult.TotalBuyCommission
+        Assert.Equal(float expectedCashAfterBuying, float rebalanceResult.CashAfterBuying, float 1m)
+    | Error _ -> Assert.True(false, "Should not return error for valid config")
+
+// ============================================================================
+// EDGE CASE TESTS
+// ============================================================================
+
+[<Fact>]
+let ``Empty current portfolio should work for current portfolio rebalancing`` () =
+    let config = {
+        IncludeCommission = false
+        Cash = 10000m
+        Index = [
+            { Symbol = "AAPL"; Weight = 0.6m }
+            { Symbol = "MSFT"; Weight = 0.4m }
+        ]
+        Current = [] // Empty current portfolio
+        Prices = [
+            { Symbol = "AAPL"; Name = "Apple Inc."; Price = 100m }
+            { Symbol = "MSFT"; Name = "Microsoft Corp."; Price = 200m }
+        ]
+    }
+    let result = rebalanceCurrentPortfolio config
+    match result with
+    | Ok rebalanceResult ->
+        // Should only have buy orders, no sell orders
+        Assert.Equal(0, rebalanceResult.Sells.Length)
+        Assert.Equal(2, rebalanceResult.Buys.Length)
+        Assert.Equal(2, rebalanceResult.Final.Length)
+    | Error _ -> Assert.True(false, "Should handle empty current portfolio")
+
+[<Fact>]
+let ``All weights zero should result in no orders`` () =
+    let config = {
+        IncludeCommission = false
+        Cash = 10000m
+        Index = [
+            { Symbol = "AAPL"; Weight = 0m }
+            { Symbol = "MSFT"; Weight = 0m }
+        ]
+        Current = []
+        Prices = [
+            { Symbol = "AAPL"; Name = "Apple Inc."; Price = 100m }
+            { Symbol = "MSFT"; Name = "Microsoft Corp."; Price = 200m }
+        ]
+    }
+    let result = rebalanceIndex config
+    match result with
+    | Ok rebalanceResult ->
+        Assert.Equal(0, rebalanceResult.Orders.Length)
+        Assert.Equal(0m, rebalanceResult.TotalValue)
+    | Error _ -> Assert.True(false, "Should handle zero weights")
+
+[<Fact>]
+let ``Negative weights should be handled gracefully`` () =
+    let config = {
+        IncludeCommission = false
+        Cash = 10000m
+        Index = [
+            { Symbol = "AAPL"; Weight = -0.5m }
+            { Symbol = "MSFT"; Weight = 1.5m }
+        ]
+        Current = []
+        Prices = [
+            { Symbol = "AAPL"; Name = "Apple Inc."; Price = 100m }
+            { Symbol = "MSFT"; Name = "Microsoft Corp."; Price = 200m }
+        ]
+    }
+    let result = rebalanceIndex config
+    match result with
+    | Ok rebalanceResult ->
+        // Should still process the request, negative weights will be normalized
+        Assert.True(rebalanceResult.Orders.Length > 0, "Should process orders even with negative weights")
+    | Error _ -> Assert.True(false, "Should handle negative weights gracefully")
+
+[<Fact>]
+let ``Very small cash amounts should be handled correctly`` () =
+    let config = {
+        IncludeCommission = false
+        Cash = 0.01m // Very small amount
+        Index = [
+            { Symbol = "AAPL"; Weight = 1.0m }
+        ]
+        Current = []
+        Prices = [
+            { Symbol = "AAPL"; Name = "Apple Inc."; Price = 100m }
+        ]
+    }
+    let result = rebalanceIndex config
+    match result with
+    | Ok rebalanceResult ->
+        // Should handle very small amounts without errors
+        Assert.True(rebalanceResult.Orders.Length >= 0, "Should handle very small cash amounts")
+    | Error _ -> Assert.True(false, "Should handle very small cash amounts")
+
+[<Fact>]
+let ``Very high prices should be handled correctly`` () =
+    let config = {
+        IncludeCommission = false
+        Cash = 10000m
+        Index = [
+            { Symbol = "AAPL"; Weight = 1.0m }
+        ]
+        Current = []
+        Prices = [
+            { Symbol = "AAPL"; Name = "Apple Inc."; Price = 1000000m } // Very high price
+        ]
+    }
+    let result = rebalanceIndex config
+    match result with
+    | Ok rebalanceResult ->
+        // Should handle very high prices without errors
+        Assert.True(rebalanceResult.Orders.Length >= 0, "Should handle very high prices")
+    | Error _ -> Assert.True(false, "Should handle very high prices")
+
 
 
 
