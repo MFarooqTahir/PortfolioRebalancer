@@ -2,7 +2,6 @@ module PortfolioImporter
 
 open System.IO
 open System.Text.Json
-open System.Text.Json.Serialization
 open Types
 open Db
 

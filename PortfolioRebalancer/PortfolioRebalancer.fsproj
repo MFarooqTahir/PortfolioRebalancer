@@ -12,6 +12,7 @@
 		<Compile Include="Scraper.fs" />
 		<Compile Include="Table.fs" />
 		<Compile Include="PortfolioImporter.fs" />
+		<Compile Include="RebalancingCalculations.fs" />
 		<Compile Include="Rebalancer.fs" />
 		<Compile Include="Program.fs" />
 	</ItemGroup>
