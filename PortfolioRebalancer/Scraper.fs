@@ -87,7 +87,7 @@ let ScrapeIndexDataAsync (driver: IWebDriver) (url: string) (code: string) = asy
     
     try
         driver.Navigate().GoToUrl url
-        printfn "Navigated to: %s\n" url
+        Logging.info (sprintf "Navigated to: %s" url)
 
         let! kseLink = WaitForElementAsync driver (By.CssSelector $"a[data-code='{code}']") 15.0
         
@@ -99,7 +99,7 @@ let ScrapeIndexDataAsync (driver: IWebDriver) (url: string) (code: string) = asy
             match clickResult with
             | Error err -> return Error err
             | Ok _ ->
-                printfn "Clicked %s link" code
+                Logging.logger.Info (sprintf "Clicked %s link" code)
                 do! Async.Sleep 3000
                 
                 let! selectElement = WaitForElementAsync driver (By.Name "DataTables_Table_1_length") 15.0
@@ -109,7 +109,7 @@ let ScrapeIndexDataAsync (driver: IWebDriver) (url: string) (code: string) = asy
                 | Ok element ->
                     let select = SelectElement(element)
                     select.SelectByValue("100")
-                    printfn "Changed table length to 100"
+                    Logging.logger.Info "Changed table length to 100"
                     do! Async.Sleep 3000
 
                     
@@ -119,14 +119,14 @@ let ScrapeIndexDataAsync (driver: IWebDriver) (url: string) (code: string) = asy
                     | Error err -> return Error err
                     | Ok table ->
                         let rows = table.FindElements(By.CssSelector("tbody tr"))
-                        printfn "Found %d rows in table" rows.Count
+                        Logging.logger.Info (sprintf "Found %d rows in table" rows.Count)
                         
                         let stockDataResult = ExtractStockDataFromTable rows
                         
                         match stockDataResult with
                         | Error err -> return Error err
                         | Ok stockData ->
-                            printfn "Extracted %d stock records" (List.length stockData)
+                            Logging.logger.Info (sprintf "Extracted %d stock records" (List.length stockData))
                             return Ok stockData
     with
     | ex -> 
@@ -137,7 +137,7 @@ let GetStockFromPSXAsync (driver: IWebDriver) (symbol: string) = async {
     try
         let url = sprintf "https://dps.psx.com.pk/company/%s" symbol
         driver.Navigate().GoToUrl url
-        printfn "Fetching price for %s from %s" symbol url
+        Logging.logger.Debug (sprintf "Fetching price for %s from %s" symbol url)
     
         do! Task.Delay 2000 |> Async.AwaitTask
     
@@ -155,23 +155,23 @@ let GetStockFromPSXAsync (driver: IWebDriver) (symbol: string) = async {
 
                 match priceText, name with
                 | ValidDecimal price, nameText when not (String.IsNullOrEmpty(nameText)) -> 
-                    printfn "Found price for %s: %s" symbol (formatPKR price)
+                    Logging.logger.Debug (sprintf "Found price for %s: %s" symbol (formatPKR price))
                     return Ok (price, nameText)
                 | _, _ -> 
-                    printfn "Could not parse price for %s: %s or name error %s" symbol priceText name
+                    Logging.logger.Warning (sprintf "Could not parse price for %s: %s or name error %s" symbol priceText name)
                     return Error (DataExtractionError $"Invalid price format for {symbol}: {priceText}")
             | Error err ->
-                printfn "Could not extract name for %s" symbol
+                Logging.logger.Warning (sprintf "Could not extract name for %s" symbol)
                 return Error err
         | Error err, _ -> 
-            printfn "Could not find price element for %s" symbol
+            Logging.logger.Warning (sprintf "Could not find price element for %s" symbol)
             return Error err
         | _, Error err -> 
-            printfn "Could not find name element for %s" symbol
+            Logging.logger.Warning (sprintf "Could not find name element for %s" symbol)
             return Error err
     with
     | ex -> 
-        printfn "Error getting price for %s: %s" symbol ex.Message
+        Logging.logger.Error (sprintf "Error getting price for %s: %s" symbol ex.Message)
         return Error (DataExtractionError $"Failed to get price for {symbol}: {ex.Message}")
 }
 
@@ -189,7 +189,7 @@ let private GetMissingStockPricesAsync (driver: IWebDriver) (missingSymbols: str
             }
             results <- stockRow :: results
         | Error _ ->
-            printfn "Skipping %s - could not get price" symbol
+            Logging.logger.Warning (sprintf "Skipping %s - could not get price" symbol)
     
     return results
 }
@@ -274,6 +274,6 @@ let ConstructIndexCache getLatestStockPrices indexType = async {
                                 Weight = x.Weight
                         });
             do! setIndexRecordsAsync indexData
-            printfn "Cache constructed"
+            Logging.logger.Info "Cache constructed"
             return Ok ()
 }

@@ -5,6 +5,7 @@ open System.Text.Json
 open Types
 open Db
 open System
+open Logging
 
 let options = JsonSerializerOptions()
 do
@@ -13,14 +14,14 @@ let importCurrentPortfolioFromJson (filePath: string) = async {
     try
         // Check if file exists
         if not (File.Exists(filePath)) then
-            printfn "[ERROR] File not found: %s" filePath
-            printfn "Please ensure the file exists and the path is correct."
+            Logging.logger.Error (sprintf "File not found: %s" filePath)
+            Logging.logger.Error "Please ensure the file exists and the path is correct."
             return ()
         
         // Check if file is empty
         let fileInfo = FileInfo(filePath)
         if fileInfo.Length = 0L then
-            printfn "[ERROR] File is empty: %s" filePath
+            Logging.logger.Error (sprintf "File is empty: %s" filePath)
             return ()
         
         // Read and parse JSON
@@ -29,14 +30,14 @@ let importCurrentPortfolioFromJson (filePath: string) = async {
         
         match records with
         | None -> 
-            printfn "[ERROR] Could not parse current portfolio JSON."
-            printfn "Please check the JSON format and ensure it matches the required structure."
+            Logging.logger.Error "Could not parse current portfolio JSON."
+            Logging.logger.Error "Please check the JSON format and ensure it matches the required structure."
             return ()
         | Some xs ->
             // Validate that we have at least one record
             if List.isEmpty xs then
-                printfn "[ERROR] Portfolio file contains no records."
-                printfn "Please ensure the JSON contains at least one portfolio entry."
+                Logging.logger.Error "Portfolio file contains no records."
+                Logging.logger.Error "Please ensure the JSON contains at least one portfolio entry."
                 return ()
             
             // Validate each record and filter out ETFs
@@ -67,42 +68,41 @@ let importCurrentPortfolioFromJson (filePath: string) = async {
             let etfs, stocks = xs |> List.partition (fun record -> isETF record.Symbol)
             
             if not (List.isEmpty etfs) then
-                printfn "[INFO] ETFs detected and will be excluded from import:"
-                etfs |> List.iter (fun etf -> printfn "  - %s (ETF)" etf.Symbol)
-                printfn ""
+                Logging.logger.Info "ETFs detected and will be excluded from import:"
+                etfs |> List.iter (fun etf -> Logging.logger.Info (sprintf "  - %s (ETF)" etf.Symbol))
             
             if List.isEmpty stocks then
-                printfn "[ERROR] No valid stocks found after filtering ETFs."
-                printfn "Please ensure your portfolio contains individual stocks, not just ETFs."
+                Logging.logger.Error "No valid stocks found after filtering ETFs."
+                Logging.logger.Error "Please ensure your portfolio contains individual stocks, not just ETFs."
                 return ()
             
             if not (List.isEmpty validationErrors) then
-                printfn "[ERROR] Validation errors found:"
-                validationErrors |> List.iter (printfn "  - %s")
+                Logging.logger.Error "Validation errors found:"
+                validationErrors |> List.iter (fun error -> Logging.logger.Error (sprintf "  - %s" error))
                 return ()
             
             // Import to database (only stocks, not ETFs)
             do! setCurrentPortfolioAsync stocks
-            printfn "[SUCCESS] Current portfolio imported and saved to database."
-            printfn "  - File: %s" filePath
-            printfn "  - Stocks imported: %d" stocks.Length
-            printfn "  - ETFs excluded: %d" etfs.Length
-            printfn "  - Total value: %M" (stocks |> List.sumBy (fun r -> decimal r.Shares * r.Price))
+            Logging.logger.Info "Current portfolio imported and saved to database."
+            Logging.logger.Info (sprintf "  - File: %s" filePath)
+            Logging.logger.Info (sprintf "  - Stocks imported: %d" stocks.Length)
+            Logging.logger.Info (sprintf "  - ETFs excluded: %d" etfs.Length)
+            Logging.logger.Info (sprintf "  - Total value: %M" (stocks |> List.sumBy (fun r -> decimal r.Shares * r.Price)))
             
     with 
     | :? DirectoryNotFoundException as ex ->
-        printfn "[ERROR] Directory not found: %s" ex.Message
-        printfn "Please check the file path and ensure the directory exists."
+        Logging.logger.Error (sprintf "Directory not found: %s" ex.Message)
+        Logging.logger.Error "Please check the file path and ensure the directory exists."
     | :? FileNotFoundException as ex ->
-        printfn "[ERROR] File not found: %s" ex.Message
-        printfn "Please check the file path and ensure the file exists."
+        Logging.logger.Error (sprintf "File not found: %s" ex.Message)
+        Logging.logger.Error "Please check the file path and ensure the file exists."
     | :? System.UnauthorizedAccessException as ex ->
-        printfn "[ERROR] Access denied: %s" ex.Message
-        printfn "Please check file permissions and ensure you have read access."
+        Logging.logger.Error (sprintf "Access denied: %s" ex.Message)
+        Logging.logger.Error "Please check file permissions and ensure you have read access."
     | :? JsonException as ex ->
-        printfn "[ERROR] Invalid JSON format: %s" ex.Message
-        printfn "Please check the JSON syntax and structure."
+        Logging.logger.Error (sprintf "Invalid JSON format: %s" ex.Message)
+        Logging.logger.Error "Please check the JSON syntax and structure."
     | ex ->
-        printfn "[ERROR] Failed to import current portfolio: %s" ex.Message
-        printfn "Please check the file and try again."
+        Logging.logger.Error (sprintf "Failed to import current portfolio: %s" ex.Message)
+        Logging.logger.Error "Please check the file and try again."
 }
