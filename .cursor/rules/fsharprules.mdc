@@ -15,3 +15,4 @@ alwaysApply: false
 - Never use boxing
 - Always use async when possible, never run anything in sync unless it is the only way to do it.
 - Always use the best F# formatting for readability
+- Always use the new _. syntax for lambda functions where possible

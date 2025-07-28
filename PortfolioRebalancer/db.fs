@@ -10,8 +10,6 @@ open Performance
 
 OptionTypes.register()
 
-
-
 let private getConnection() = 
     try
         new NpgsqlConnection(Database.ConnectionString)
@@ -20,7 +18,6 @@ let private getConnection() =
         logger.Error (sprintf "Failed to create database connection: %s" ex.Message)
         reraise()
 
-// Note: Retry logic removed for simplicity - can be added later with proper exception handling
 let ensureTablesAsync() = async {
     use conn = getConnection()
     do! conn.OpenAsync() |> Async.AwaitTask
@@ -170,7 +167,6 @@ let getCurrentPortfolioAsync() = async {
             |> Async.AwaitTask
 
         let records = results |> Seq.toList
-        // Cache for 5 minutes (portfolio changes when imported)
         cacheManager.Set("current_portfolio", records, 5)
         logger.Debug (sprintf "Cached %d current portfolio records for 5 minutes" records.Length)
         return records
