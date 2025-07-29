@@ -12,7 +12,7 @@ open PortfolioRebalancer.Core.Logger
 let options = JsonSerializerOptions()
 do
     options.PropertyNamingPolicy <- JsonNamingPolicy.CamelCase
-    JsonFSharpOptions.Default().AddToJsonSerializerOptions(options)
+    JsonFSharpOptions.Default().WithUnionAdjacentTag().AddToJsonSerializerOptions(options)
 let importCurrentPortfolioFromJson (filePath: string) = async {
     let logger: ILogger = getModuleLoggerByName "PortfolioImporter"
     logger.LogInformation("Starting portfolio import from: {FilePath}", filePath)
