@@ -12,8 +12,6 @@
 		<Compile Include="Validation.fs" />
 		<Compile Include="Logging.fs" />
 		<Compile Include="Performance.fs" />
-		<Compile Include="Extensions.fs" />
-		<Compile Include="Messages.fs" />
 		<Compile Include="Db.fs" />
 		<Compile Include="Scraper.fs" />
 		<Compile Include="Table.fs" />
@@ -28,21 +26,21 @@
 		<PackageReference Include="Dapper" Version="2.1.66" />
 		<PackageReference Include="Dapper.FSharp" Version="4.9.0" />
 		<PackageReference Include="FSharp.SystemTextJson" Version="1.4.36" />
-		<PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.0" />
-		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.0" />
-		<PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="9.0.0" />
-		<PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" Version="9.0.0" />
-		<PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
-		<PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.0" />
-		<PackageReference Include="Serilog" Version="3.1.1" />
-		<PackageReference Include="Serilog.Extensions.Logging" Version="8.0.0" />
-		<PackageReference Include="Serilog.Sinks.Console" Version="5.0.1" />
-		<PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.7" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.7" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="9.0.7" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" Version="9.0.7" />
+		<PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.7" />
+		<PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.7" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.7" />
+		<PackageReference Include="Serilog" Version="4.3.0" />
+		<PackageReference Include="Serilog.Extensions.Logging" Version="9.0.2" />
+		<PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+		<PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
 		<PackageReference Include="Npgsql" Version="9.0.3" />
 		<PackageReference Include="Selenium.Support" Version="4.34.0" />
 		<PackageReference Include="Selenium.WebDriver" Version="4.34.0" />
-		<PackageReference Include="Selenium.WebDriver.ChromeDriver" Version="138.0.7204.15700" />
+		<PackageReference Include="Selenium.WebDriver.ChromeDriver" Version="138.0.7204.16800" />
 		<PackageReference Include="Spectre.Console" Version="0.50.0" />
 	</ItemGroup>
 

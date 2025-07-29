@@ -11,7 +11,6 @@ open Validation
 open Performance
 open Spectre.Console
 
-// Enhanced menu options with better organization
 type MenuOption = 
     | ShowPortfolio
     | ImportPortfolio
@@ -35,7 +34,6 @@ let parseMenuOption (input: string) : MenuOption =
     | "0" -> Exit
     | _ -> Invalid
 
-// Enhanced menu display with Spectre.Console table
 let displayMenu () =
     let menuTable = 
         Table()
@@ -83,7 +81,6 @@ let rec getConfirmation (message: string) : bool =
         printfn "Please enter 'y' for yes or 'n' for no."
         getConfirmation message
 
-// Handle rebalancing with cash input and performance monitoring
 let handleRebalancing (kind: string) (includeCommission: bool) =
     match getCashAmount() with
     | Some cash ->
@@ -106,7 +103,7 @@ let handleRebalancing (kind: string) (includeCommission: bool) =
 let printErrors (result: Result<unit, ScrapingError>) =
     match result with
     | Error error -> 
-        AnsiConsole.MarkupLine("[red][ERROR] Operation failed:[/]")
+        AnsiConsole.MarkupLine "[red][ERROR] Operation failed:[/]"
         match error with
         | NavigationError msg -> AnsiConsole.MarkupLine(sprintf "[red]Navigation Error: %s[/]" msg)
         | ElementNotFound msg -> AnsiConsole.MarkupLine(sprintf "[red]Element Not Found: %s[/]" msg)
@@ -117,7 +114,6 @@ let printErrors (result: Result<unit, ScrapingError>) =
         | NetworkError msg -> AnsiConsole.MarkupLine(sprintf "[red]Network Error: %s[/]" msg)
     | _ -> ()
 
-// Enhanced menu handler with better error handling and new options
 let handleMenuOption (option: MenuOption) : Async<bool> =
     async {
         try
@@ -132,7 +128,7 @@ let handleMenuOption (option: MenuOption) : Async<bool> =
                 printf "Enter the path to your portfolio JSON file: "
                 let filePath = Console.ReadLine().Trim()
                 
-                if System.String.IsNullOrWhiteSpace(filePath) then
+                if String.IsNullOrWhiteSpace filePath then
                     AnsiConsole.MarkupLine "[red]❌ No file path provided. Import cancelled.[/]"
                 else
                     do! importCurrentPortfolioFromJson filePath
@@ -175,7 +171,7 @@ let handleMenuOption (option: MenuOption) : Async<bool> =
                         let status = if metric.Success then "[green]✅[/]" else "[red]❌[/]"
                         let operation = metric.OperationName
                         let duration = metric.Duration.ToString()
-                        let time = metric.Timestamp.ToString("HH:mm:ss")
+                        let time = metric.Timestamp.ToString "HH:mm:ss"
                         performanceTable.AddRow(status, operation, duration, time) |> ignore)
                     
                     AnsiConsole.Write(performanceTable)

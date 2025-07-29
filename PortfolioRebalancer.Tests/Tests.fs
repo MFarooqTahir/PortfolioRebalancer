@@ -1,13 +1,12 @@
 module Tests
 
 open Xunit
+open Xunit.Extensions
 open System
 open Types
-open Helpers
 open Validation
+open Helpers
 open Configuration
-open Extensions
-open Messages
 open RebalancingCalculations
 
 // ============================================================================
@@ -390,21 +389,6 @@ let ``Configuration should have valid validation settings`` () =
     Assert.True(Validation.MaxSymbolLength > 0)
     Assert.True(Validation.MinSymbolLength >= 0)
     Assert.True(Validation.MaximumCashAmount > 0m)
-
-// ============================================================================
-// MESSAGES TESTS
-// ============================================================================
-
-[<Fact>]
-let ``Messages should contain error messages`` () =
-    Assert.NotNull Errors.InvalidCashAmount
-    Assert.NotNull Errors.InvalidSymbol
-    Assert.NotNull Errors.EmptyIndex
-
-[<Fact>]
-let ``Messages should contain success messages`` () =
-    Assert.NotNull Success.RebalancingCompleted
-    Assert.NotNull Success.PortfolioImported
 
 // ============================================================================
 // ADVANCED CALCULATION TESTS
