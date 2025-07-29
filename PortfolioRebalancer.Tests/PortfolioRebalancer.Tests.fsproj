@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\PortfolioRebalancer\PortfolioRebalancer.fsproj" />
+    <ProjectReference Include="..\src\PortfolioRebalancer.Core\PortfolioRebalancer.Core.fsproj" />
   </ItemGroup>
 
   <ItemGroup>

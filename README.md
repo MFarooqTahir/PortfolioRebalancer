@@ -1,6 +1,6 @@
 # Portfolio Rebalancer
 
-A comprehensive F# application for portfolio rebalancing with support for index-based and current portfolio rebalancing strategies. Built with modern .NET technologies and functional programming principles.
+A comprehensive F# application for portfolio rebalancing with support for index-based and current portfolio rebalancing strategies. Built with modern .NET technologies and functional programming principles using a modular architecture.
 
 ## ⚡ Quick Start
 
@@ -12,7 +12,7 @@ A comprehensive F# application for portfolio rebalancing with support for index-
 2. **Build & Run:**
    ```bash
    dotnet build
-   dotnet run --project PortfolioRebalancer/
+   dotnet run --project src/PortfolioRebalancer.Console/
    ```
 
 3. **Get Started:**
@@ -28,10 +28,12 @@ A comprehensive F# application for portfolio rebalancing with support for index-
 - **🌐 Data Scraping**: Automated data collection from financial websites
 - **🗄️ PostgreSQL Storage**: Robust data persistence with intelligent caching
 - **⚡ Performance Monitoring**: Built-in caching and comprehensive metrics
-- **📝 Advanced Logging**: Environment-aware logging system
+- **📝 Advanced Logging**: Environment-aware logging with Serilog
 - **🛡️ Type Safety**: Full F# type safety with discriminated unions
 - **🧪 Comprehensive Testing**: 51 unit tests with 100% coverage
 - **⚙️ Configuration Management**: JSON-based configuration with environment support
+- **🏗️ Modular Architecture**: Clean separation of concerns across multiple projects
+- **🧹 Clean Code**: Eliminated code duplication and optimized patterns
 
 ## 📊 Performance & Monitoring
 
@@ -60,10 +62,11 @@ cacheManager.Set("current_portfolio", records, 5)
 
 ## 📝 Logging System
 
-### Environment-Aware Logging
+### Environment-Aware Logging with Serilog
 - **Development**: Console output with debug information
 - **Production**: File logging with automatic rotation
 - **Configurable Levels**: Adjust verbosity per environment
+- **Structured Logging**: Rich log format with timestamps and scopes
 
 ### Logging Configuration
 ```json
@@ -71,7 +74,8 @@ cacheManager.Set("current_portfolio", records, 5)
   "Logging": {
     "LogLevel": {
       "Default": "Information",
-      "Microsoft": "Warning"
+      "Microsoft": "Warning",
+      "PortfolioRebalancer": "Debug"
     },
     "Console": {
       "IncludeScopes": true,
@@ -79,6 +83,7 @@ cacheManager.Set("current_portfolio", records, 5)
     },
     "File": {
       "Path": "logs/portfolio-{Date}.log",
+      "LogLevel": { "Default": "Information" },
       "FileSizeLimitBytes": 10485760,
       "RetainedFileCountLimit": 31
     }
@@ -92,9 +97,16 @@ cacheManager.Set("current_portfolio", records, 5)
 - **Retention**: 31 days of log history
 - **Thread-Safe**: Proper locking for concurrent access
 
+### Best Practice Logging Pattern
+```fsharp
+// Module-level logger (clean, no parameter pollution)
+let logger: ILogger = getModuleLoggerByName "PortfolioImporter"
+logger.LogInformation("Starting portfolio import from: {FilePath}", filePath)
+```
+
 ## ⚙️ Configuration
 
-The application uses JSON-based configuration with environment support:
+The application uses JSON-based configuration with environment support and eliminates code duplication:
 
 ### Configuration Files
 
@@ -135,6 +147,16 @@ The application uses JSON-based configuration with environment support:
     "LogLevel": {
       "Default": "Information",
       "Microsoft": "Warning"
+    },
+    "Console": {
+      "IncludeScopes": true,
+      "TimestampFormat": "yyyy-MM-dd HH:mm:ss "
+    },
+    "File": {
+      "Path": "logs/portfolio-{Date}.log",
+      "LogLevel": { "Default": "Information" },
+      "FileSizeLimitBytes": 10485760,
+      "RetainedFileCountLimit": 31
     }
   }
 }
@@ -154,19 +176,62 @@ The application uses JSON-based configuration with environment support:
 
 ## 🏗️ Architecture
 
-Built with functional programming principles and clean architecture:
+Built with functional programming principles and clean architecture using a modular project structure:
+
+### Project Structure
+
+```
+PortfolioRebalancer/
+├── src/
+│   ├── PortfolioRebalancer.Core/           # Core business logic library
+│   │   ├── Types.fs                       # Domain types and data structures
+│   │   ├── Configuration.fs                # Environment-aware settings
+│   │   ├── Validation.fs                   # Input validation with Result types
+│   │   ├── Helpers.fs                      # Utility functions and calculations
+│   │   ├── ServiceContainer.fs             # Dependency injection container
+│   │   ├── Logger.fs                       # Best practice logging patterns
+│   │   ├── Performance.fs                  # Caching and metrics system
+│   │   └── RebalancingCalculations.fs      # Pure calculation logic
+│   ├── PortfolioRebalancer.Data/           # Data access layer
+│   │   ├── Db.fs                          # Database operations with caching
+│   │   └── PortfolioImporter.fs            # Portfolio import/export functionality
+│   ├── PortfolioRebalancer.Scraper/        # Web scraping functionality
+│   │   └── Scraper.fs                     # Selenium-based data collection
+│   └── PortfolioRebalancer.Console/        # Console application
+│       ├── Program.fs                     # Main application entry point
+│       ├── Rebalancer.fs                  # Business logic orchestration
+│       ├── Table.fs                       # Rich console output formatting
+│       └── appsettings.json              # Configuration files
+├── PortfolioRebalancer.Tests/              # Test project
+│   └── Tests.fs                           # Comprehensive test suite
+├── PortfolioRebalancer.sln                 # Solution file
+└── README.md                              # This file
+```
 
 ### Core Modules
 
 - **Types.fs** - Domain types and data structures
-- **Configuration.fs** - Environment-aware settings
+- **Configuration.fs** - Environment-aware settings with shared configuration builder
 - **Validation.fs** - Input validation with Result types
 - **RebalancingCalculations.fs** - Pure calculation logic
-- **Rebalancer.fs** - Business logic orchestration
-- **Db.fs** - Database operations with caching
-- **Scraper.fs** - Web scraping functionality
+- **Helpers.fs** - Utility functions and calculations
+- **ServiceContainer.fs** - Dependency injection with Serilog integration
+- **Logger.fs** - Best practice logging patterns (module-level, functional injection)
 - **Performance.fs** - Caching and metrics system
-- **Logging.fs** - Advanced logging infrastructure
+
+### Data Layer
+
+- **Db.fs** - Database operations with caching
+- **PortfolioImporter.fs** - Portfolio import/export functionality
+
+### Scraping Layer
+
+- **Scraper.fs** - Web scraping functionality using Selenium
+
+### Console Application
+
+- **Program.fs** - Main application entry point
+- **Rebalancer.fs** - Business logic orchestration
 - **Table.fs** - Rich console output formatting
 
 ### Design Principles
@@ -176,7 +241,9 @@ Built with functional programming principles and clean architecture:
 - **🛡️ Type Safety**: Compile-time guarantees with discriminated unions
 - **⚠️ Error Handling**: Result types for explicit error handling
 - **⚡ Performance**: Built-in caching and performance monitoring
-- **📝 Logging**: Comprehensive logging for debugging and monitoring
+- **📝 Logging**: Comprehensive logging with best practice patterns
+- **🏗️ Modularity**: Clean separation of concerns across projects
+- **🧹 Clean Code**: Eliminated code duplication and optimized patterns
 
 ## 📥 Portfolio Import
 
@@ -218,14 +285,19 @@ dotnet test
 ### Common Commands
 
 ```bash
-# Build
+# Build entire solution
 dotnet build
 
-# Run
-dotnet run --project PortfolioRebalancer/
+# Run console application
+dotnet run --project src/PortfolioRebalancer.Console/
 
-# Test
+# Run tests
 dotnet test
+
+# Build specific project
+dotnet build src/PortfolioRebalancer.Core/
+dotnet build src/PortfolioRebalancer.Data/
+dotnet build src/PortfolioRebalancer.Scraper/
 
 # Database management
 docker start portfolio-postgres
@@ -236,22 +308,23 @@ $env:DOTNET_ENVIRONMENT="Development"
 $env:DOTNET_ENVIRONMENT="Production"
 ```
 
-### Project Structure
+### Project Dependencies
 
 ```
-PortfolioRebalancer/
-├── PortfolioRebalancer/           # Main application
-│   ├── Configuration.fs           # Environment-aware settings
-│   ├── Logging.fs                 # Advanced logging system
-│   ├── Performance.fs             # Caching and metrics
-│   ├── Db.fs                      # Database operations
-│   ├── Scraper.fs                 # Web scraping
-│   ├── Rebalancer.fs              # Business logic
-│   └── ...                        # Other modules
-├── PortfolioRebalancer.Tests/     # Test project
-├── appsettings.json              # Base configuration
-├── appsettings.Development.json  # Development overrides
-└── appsettings.Production.json   # Production settings (gitignored)
+PortfolioRebalancer.Console
+├── PortfolioRebalancer.Core
+├── PortfolioRebalancer.Data
+└── PortfolioRebalancer.Scraper
+
+PortfolioRebalancer.Data
+└── PortfolioRebalancer.Core
+
+PortfolioRebalancer.Scraper
+├── PortfolioRebalancer.Core
+└── PortfolioRebalancer.Data
+
+PortfolioRebalancer.Tests
+└── PortfolioRebalancer.Core
 ```
 
 ### Code Quality
@@ -259,9 +332,11 @@ PortfolioRebalancer/
 - **✅ Clean Code**: Consistent F# coding standards
 - **✅ Error Handling**: Comprehensive Result-based error handling
 - **✅ Performance**: Optimized with intelligent caching
-- **✅ Logging**: Structured logging with environment awareness
+- **✅ Logging**: Structured logging with Serilog and best practices
 - **✅ Testing**: 100% test coverage of critical functionality
 - **✅ Documentation**: Comprehensive inline documentation
+- **✅ Modularity**: Clean separation of concerns across projects
+- **✅ No Duplication**: Eliminated code duplication with shared utilities
 
 ## 🚀 Performance Features
 
@@ -276,6 +351,27 @@ PortfolioRebalancer/
 - **Error tracking and analysis**
 - **Performance trend monitoring**
 - **Cache effectiveness metrics**
+
+## 🔄 Recent Improvements
+
+### Code Cleanup & Optimization
+- **Eliminated Code Duplication**: Shared configuration builder function
+- **Removed Unused Code**: Deleted 4 unused logger pattern files
+- **Simplified Logging**: Best practice module-level logger pattern
+- **Enhanced Configuration**: Type-safe configuration access with defaults
+- **Improved Architecture**: Cleaner dependency injection with Serilog
+
+### Logging Enhancements
+- **Serilog Integration**: Rich structured logging with file output
+- **Environment Awareness**: Different settings for Development/Production
+- **Best Practice Patterns**: Module-level loggers without parameter pollution
+- **Automatic Rotation**: Daily log files with size limits and retention
+
+### Configuration Improvements
+- **Shared Configuration**: Single source of truth for configuration setup
+- **Type Safety**: Strongly typed configuration values with defaults
+- **Environment Support**: Automatic environment-specific overrides
+- **Centralized Management**: All configuration in one module
 
 ## 📄 License
 

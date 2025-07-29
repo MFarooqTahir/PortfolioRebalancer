@@ -1,10 +1,12 @@
-module Performance
+module PortfolioRebalancer.Core.Performance
 
 open System
+open System.Collections.Generic
 open System.Collections.Concurrent
 open System.Diagnostics
-open Types
-open Logging
+open PortfolioRebalancer.Core.Types
+open Microsoft.Extensions.Logging
+open PortfolioRebalancer.Core.Logger
 
 // Simple in-memory cache
 type Cache<'T> = {
@@ -52,6 +54,7 @@ type PerformanceMetrics = {
 let private performanceMetrics = ConcurrentQueue<PerformanceMetrics>()
 
 let measureOperation<'T> (operationName: string) (operation: unit -> 'T) : 'T =
+    let logger: ILogger = getModuleLoggerByName "Performance"
     let stopwatch = Stopwatch.StartNew()
     let timestamp = DateTime.Now
     
@@ -67,7 +70,7 @@ let measureOperation<'T> (operationName: string) (operation: unit -> 'T) : 'T =
         }
         
         performanceMetrics.Enqueue(metrics)
-        logger.Debug (sprintf "Operation '%s' completed in %O" operationName stopwatch.Elapsed)
+        logger.LogDebug("Operation '{OperationName}' completed in {Duration}", operationName, stopwatch.Elapsed)
         result
     with
     | ex ->
@@ -80,7 +83,7 @@ let measureOperation<'T> (operationName: string) (operation: unit -> 'T) : 'T =
         }
         
         performanceMetrics.Enqueue(metrics)
-        logger.Error (sprintf "Operation '%s' failed after %O: %s" operationName stopwatch.Elapsed ex.Message)
+        logger.LogError(ex, "Operation '{OperationName}' failed after {Duration}", operationName, stopwatch.Elapsed)
         reraise()
 
 // Note: Async operation measurement removed due to F# version compatibility
@@ -91,16 +94,20 @@ let getPerformanceStats() : PerformanceMetrics list =
 
 // Clear old metrics (older than specified hours)
 let clearOldMetrics (hoursOld: int) =
+    let logger: ILogger = getModuleLoggerByName "Performance"
     let cutoffTime = DateTime.Now.AddHours(-float hoursOld)
     let mutable removed = 0
+    let mutable shouldContinue = true
     
-    while not performanceMetrics.IsEmpty do
+    while not performanceMetrics.IsEmpty && shouldContinue do
         match performanceMetrics.TryDequeue() with
         | true, metric when metric.Timestamp < cutoffTime ->
             removed <- removed + 1
         | true, metric ->
-            performanceMetrics.Enqueue(metric) // Put it back
-            ()
-        | false, _ -> ()
+            // Put it back if it's not old enough
+            performanceMetrics.Enqueue(metric)
+            shouldContinue <- false
+        | false, _ -> 
+            shouldContinue <- false
     
-    logger.Info (sprintf "Cleared %d old performance metrics" removed) 
+    logger.LogInformation("Cleared {Count} old performance metrics", removed) 

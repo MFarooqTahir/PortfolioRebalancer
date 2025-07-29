@@ -1,4 +1,4 @@
-﻿module Types
+﻿module PortfolioRebalancer.Core.Types
 
 // Enhanced error types with better categorization
 type ScrapingError = 

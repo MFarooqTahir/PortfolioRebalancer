@@ -1,8 +1,8 @@
-module RebalancingCalculations
+module PortfolioRebalancer.Core.RebalancingCalculations
 
-open Types
-open Helpers
-open Validation
+open PortfolioRebalancer.Core.Types
+open PortfolioRebalancer.Core.Helpers
+open PortfolioRebalancer.Core.Validation
 
 // Helper functions for price and weight mapping
 let createPriceMap (prices: StockRecord list) =

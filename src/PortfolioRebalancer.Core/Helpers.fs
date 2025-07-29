@@ -1,8 +1,9 @@
-﻿module Helpers
+﻿module PortfolioRebalancer.Core.Helpers
 
-open System.Globalization
 open System
-open Types
+open System.Globalization
+open PortfolioRebalancer.Core.Types
+open PortfolioRebalancer.Core.Configuration
 
 let indianCulture = CultureInfo Configuration.App.DefaultCulture
 do

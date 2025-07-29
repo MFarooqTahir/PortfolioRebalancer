@@ -1,9 +1,12 @@
-﻿module Rebalancer
+﻿module PortfolioRebalancer.Console.Rebalancer
 
-open Types
-open Helpers
-open Table
-open RebalancingCalculations
+open PortfolioRebalancer.Core.Types
+open PortfolioRebalancer.Core.Helpers
+open PortfolioRebalancer.Core.RebalancingCalculations
+open PortfolioRebalancer.Console.Table
+open PortfolioRebalancer.Core.Performance
+open Microsoft.Extensions.Logging
+open PortfolioRebalancer.Core.Logger
 open Spectre.Console
 
 // Main rebalancing function with improved structure
@@ -14,6 +17,7 @@ let rebalanceAndDisplay
     (index: IndexTableRecord list) 
     (current: CurrentPortfolio list) 
     (prices: StockRecord list) =
+    let logger: ILogger = getModuleLoggerByName "Rebalancer"
     
     // Helper functions for better organization
     let findMissingSymbols () = 
@@ -30,17 +34,21 @@ let rebalanceAndDisplay
         
         // Show warning for missing symbols but continue
         if not (List.isEmpty missingSymbols) then
+            logger.LogWarning("No price data for symbols: {Symbols}", String.concat ", " missingSymbols)
             AnsiConsole.MarkupLine(sprintf "[yellow][WARNING] No price data for: %s[/]" (String.concat ", " missingSymbols))
         
         // Check for required data
         if List.isEmpty index then
-            AnsiConsole.MarkupLine "[red][ERROR] No index records found.[/]"
+            logger.LogError("No index records found")
+            AnsiConsole.MarkupLine "[red]❌ No index records found.[/]"
             false
         elif List.isEmpty prices then
-            AnsiConsole.MarkupLine "[red][ERROR] No stock price records found.[/]"
+            logger.LogError("No stock price records found")
+            AnsiConsole.MarkupLine "[red]❌ No stock price records found.[/]"
             false
         elif kind = "current" && List.isEmpty current then
-            AnsiConsole.MarkupLine "[red][ERROR] No current portfolio records found.[/]"
+            logger.LogError("No current portfolio records found")
+            AnsiConsole.MarkupLine "[red]❌ No current portfolio records found.[/]"
             false
         else
             true
@@ -54,8 +62,10 @@ let rebalanceAndDisplay
     }
     
     let handleIndexRebalancing config =
+        logger.LogInformation("Starting index rebalancing with cash: {Cash}", cash)
         match rebalanceIndex config with
         | Ok result ->
+            logger.LogInformation("Index rebalancing completed successfully")
             let weightMap = createWeightMap index
             let displayOrders = result.Orders |> List.map (fun order -> 
                 {| 
@@ -68,11 +78,14 @@ let rebalanceAndDisplay
                 |})
             showRebalanceIndexResult displayOrders includeCommission cash
         | Error _ -> 
-            AnsiConsole.MarkupLine "[red][ERROR] Failed to rebalance index.[/]"
+            logger.LogError("Failed to rebalance index")
+            AnsiConsole.MarkupLine "[red]❌ Failed to rebalance index.[/]"
     
     let handleCurrentPortfolioRebalancing config =
+        logger.LogInformation("Starting current portfolio rebalancing with cash: {Cash}", cash)
         match rebalanceCurrentPortfolio config with
         | Ok result ->
+            logger.LogInformation("Current portfolio rebalancing completed successfully")
             let displaySells = result.Sells |> List.map (fun order -> 
                 {| 
                     Symbol = order.Symbol
@@ -101,7 +114,8 @@ let rebalanceAndDisplay
                 |})
             showRebalanceCurrentPortfolioResult displaySells displayBuys displayFinal includeCommission cash
         | Error _ -> 
-            AnsiConsole.MarkupLine "[red][ERROR] Failed to rebalance current portfolio.[/]"
+            logger.LogError("Failed to rebalance current portfolio")
+            AnsiConsole.MarkupLine "[red]❌ Failed to rebalance current portfolio.[/]"
     
     // Main execution flow
     if validateInputs() then

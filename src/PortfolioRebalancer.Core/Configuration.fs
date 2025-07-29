@@ -1,17 +1,19 @@
-module Configuration
+module PortfolioRebalancer.Core.Configuration
 
 open System
+open System.IO
+open System.Reflection
 open Microsoft.Extensions.Configuration
 
-// Global configuration instance
-let private configuration : IConfiguration = 
+// Shared configuration builder function to eliminate code duplication
+let createConfigurationBuilder() : IConfigurationBuilder =
     let builder = ConfigurationBuilder()
     
     // Try to find the configuration files in multiple possible locations
     let possiblePaths = [
         IO.Directory.GetCurrentDirectory()
         IO.Path.GetDirectoryName(Reflection.Assembly.GetExecutingAssembly().Location)
-        IO.Path.Combine(IO.Directory.GetCurrentDirectory(), "..", "PortfolioRebalancer")
+        IO.Path.Combine(IO.Directory.GetCurrentDirectory(), "..", "PortfolioRebalancer.Console")
         IO.Path.Combine(IO.Directory.GetCurrentDirectory(), "..", "PortfolioRebalancer.Tests")
     ]
     
@@ -27,7 +29,10 @@ let private configuration : IConfiguration =
         .AddJsonFile("appsettings.Development.json", optional = true, reloadOnChange = true)
         .AddJsonFile("appsettings.Production.json", optional = true, reloadOnChange = true)
         .AddEnvironmentVariables()
-        |> fun b -> b.Build()
+
+// Global configuration instance
+let private configuration : IConfiguration = 
+    createConfigurationBuilder().Build()
 
 // Commission calculation constants
 module Commission =
@@ -55,4 +60,15 @@ module Validation =
     let MinimumWeight = configuration.GetValue<decimal>("Validation:MinimumWeight", 0m)
     let MaximumWeight = configuration.GetValue<decimal>("Validation:MaximumWeight", 1m)
     let MaxSymbolLength = configuration.GetValue<int>("Validation:MaxSymbolLength", 10)
-    let MinSymbolLength = configuration.GetValue<int>("Validation:MinSymbolLength", 1) 
+    let MinSymbolLength = configuration.GetValue<int>("Validation:MinSymbolLength", 1)
+
+// Logging configuration
+module Logging =
+    let DefaultLogLevel = configuration.GetValue<string>("Logging:LogLevel:Default", "Information")
+    let MicrosoftLogLevel = configuration.GetValue<string>("Logging:LogLevel:Microsoft", "Warning")
+    let IncludeScopes = configuration.GetValue<bool>("Logging:Console:IncludeScopes", true)
+    let TimestampFormat = configuration.GetValue<string>("Logging:Console:TimestampFormat", "yyyy-MM-dd HH:mm:ss ")
+    let FilePath = configuration.GetValue<string>("Logging:File:Path", "logs/portfolio-{Date}.log")
+    let FileLogLevel = configuration.GetValue<string>("Logging:File:LogLevel:Default", "Information")
+    let FileSizeLimitBytes = configuration.GetValue<int64>("Logging:File:FileSizeLimitBytes", 10485760L)
+    let RetainedFileCountLimit = configuration.GetValue<int>("Logging:File:RetainedFileCountLimit", 31) 

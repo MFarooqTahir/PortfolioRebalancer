@@ -1,11 +1,16 @@
-﻿module Table
+﻿module PortfolioRebalancer.Console.Table
 
+open System
+open Microsoft.Extensions.Logging
+open PortfolioRebalancer.Core.Logger
+open PortfolioRebalancer.Core.Types
+open PortfolioRebalancer.Core.Helpers
+open PortfolioRebalancer.Data.Db
 open Spectre.Console
-open Types
-open Helpers
-open Db
 
 let showSimpleCurrentPortfolio () = async {
+    let logger: ILogger = getModuleLoggerByName "Table"
+    logger.LogInformation("Loading portfolio data for display")
     let! indexRecords = getIndexRecordsAsync()
     let! stockRecords = getStockRecordsAsync()
     let! records = getCurrentPortfolioAsync()
@@ -26,7 +31,7 @@ let showSimpleCurrentPortfolio () = async {
         |> List.map (fun s ->
             let price = Map.tryFind s.Symbol priceMap |> Option.defaultValue 0m
             let weightPct = toPercentage s.Weight
-            (s.Symbol, weightPct, formatPKR price))
+            s.Symbol, weightPct, formatPKR price)
     
     match indexRows with
     | [] -> 
@@ -39,6 +44,7 @@ let showSimpleCurrentPortfolio () = async {
             indexTable.AddRow(styledSymbol, styledWeight, styledPrice) |> ignore)
     
     AnsiConsole.Write(indexTable)
+    logger.LogDebug("Displayed {Count} index records", List.length indexRows)
     
     // Display current portfolio table with enhanced styling
     let table =
@@ -84,6 +90,7 @@ let showSimpleCurrentPortfolio () = async {
             table.AddRow(styledSymbol, styledShares, styledBuyPrice, styledCurrentPrice, styledValue, styledGainLoss, styledGainLossPct) |> ignore)
     
     AnsiConsole.Write(table)
+    logger.LogDebug("Displayed {Count} portfolio records", List.length portfolioRows)
     
     // Display summary with enhanced styling
     let totalCost = records |> List.sumBy (fun s -> decimal s.Shares * s.Price)
@@ -118,6 +125,7 @@ let showSimpleCurrentPortfolio () = async {
         |> ignore
     
     AnsiConsole.Write summaryTable
+    logger.LogInformation("Portfolio display completed successfully")
     
     return ()
 }
@@ -212,6 +220,9 @@ let showRebalanceCurrentPortfolioResult
     (includeCommission: bool)
     (cash: decimal) =
     
+    let logger: ILogger = getModuleLoggerByName "Table"
+    logger.LogInformation("Displaying current portfolio rebalancing results with {SellCount} sells, {BuyCount} buys, {FinalCount} final positions", sells.Length, buys.Length, final.Length)
+    
     // Display sell orders with enhanced styling
     let sortedSells = sells |> List.sortByDescending (fun r -> r.Value)
     let sellTable =
@@ -241,6 +252,7 @@ let showRebalanceCurrentPortfolioResult
     
     sellRows |> List.iter (fun row -> sellTable.AddRow(row |> Array.ofList) |> ignore)
     AnsiConsole.Write sellTable
+    logger.LogDebug("Displayed sell orders table with {SellCount} orders", sortedSells.Length)
     
     let totalSellValue = sortedSells |> List.sumBy (fun r -> r.Value)
     let totalSellCommission = sortedSells |> List.sumBy (fun r -> r.Commission)
@@ -299,6 +311,7 @@ let showRebalanceCurrentPortfolioResult
     
     buyRows |> List.iter (fun row -> buyTable.AddRow(row |> Array.ofList) |> ignore)
     AnsiConsole.Write buyTable
+    logger.LogDebug("Displayed buy orders table with {BuyCount} orders", sortedBuys.Length)
     
     let totalBuyValue = sortedBuys |> List.sumBy (fun r -> r.Value)
     let totalBuyCommission = sortedBuys |> List.sumBy (fun r -> r.Commission)
@@ -361,6 +374,7 @@ let showRebalanceCurrentPortfolioResult
     finalRows |> List.iter (fun row -> finalTable.AddRow(row |> Array.ofList) |> ignore)
     
     finalTable.AddEmptyRow() |> ignore
+    logger.LogDebug("Displayed final portfolio table with {FinalCount} positions", sortedFinal.Length)
     
     let totalValue = sortedFinal |> List.sumBy (fun r -> r.Value)
     let totalCommission = sortedFinal |> List.sumBy (fun r -> r.Commission)
@@ -399,3 +413,4 @@ let showRebalanceCurrentPortfolioResult
         finalSummaryTable.AddRow("Total commission", styledCommission) |> ignore
     
     AnsiConsole.Write finalSummaryTable
+    logger.LogInformation("Portfolio display completed successfully")

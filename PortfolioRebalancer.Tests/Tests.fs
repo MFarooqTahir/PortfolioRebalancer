@@ -1,13 +1,12 @@
 module Tests
 
 open Xunit
-open Xunit.Extensions
 open System
-open Types
-open Validation
-open Helpers
-open Configuration
-open RebalancingCalculations
+open PortfolioRebalancer.Core.Types
+open PortfolioRebalancer.Core.Validation
+open PortfolioRebalancer.Core.Helpers
+open PortfolioRebalancer.Core.Configuration
+open PortfolioRebalancer.Core.RebalancingCalculations
 
 // ============================================================================
 // TEST DEFINITIONS (Enhanced with custom output)

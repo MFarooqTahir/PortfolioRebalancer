@@ -1,7 +1,7 @@
-module Validation
+module PortfolioRebalancer.Core.Validation
 
-open Types
-open Configuration
+open PortfolioRebalancer.Core.Types
+open PortfolioRebalancer.Core.Configuration
 
 // Enhanced validation functions with comprehensive rules
 let validateCashAmount (cash: decimal) : ValidationResult<CashAmount> =
