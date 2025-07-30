@@ -23,11 +23,19 @@ let CreateChromeDriver () =
     options.AddArgument("--disable-extensions")
     options.AddArgument("--disable-plugins")
     options.AddArgument("--disable-images")
-    options.AddArgument("--disable-javascript")
     options.AddArgument("--disable-web-security")
     options.AddArgument("--disable-features=VizDisplayCompositor")
     options.AddArgument("--window-size=1920,1080")
-    
+    options.AddArgument("--log-level=3")  // Suppress Chrome logging
+    options.AddArgument("--silent")
+    options.AddArgument("--disable-logging")
+    options.AddArgument("--disable-dev-tools")
+    options.AddArgument("--disable-background-timer-throttling")
+    options.AddArgument("--disable-backgrounding-occluded-windows")
+    options.AddArgument("--disable-renderer-backgrounding")
+    options.AddArgument("--disable-features=TranslateUI")
+    options.AddArgument("--disable-ipc-flooding-protection")
+    options.SetLoggingPreference(LogType.Browser, LogLevel.Off)
     let logger: ILogger = LoggerContext.GetLoggerByName "Scraper"
     logger.LogInformation("Creating ChromeDriver with headless configuration...")
     let driver = new ChromeDriver(options)
@@ -267,19 +275,124 @@ let GetStockFromPSXAsync (driver: IWebDriver) (symbol: string) = async {
         return Error (DataExtractionError $"Failed to get price for {symbol}: {ex.Message}")
 }
 
-// Restored version with database operations
-let ConstructIndexCache (forceRefresh: bool) (indexType: IndexType) = async {
+let ScrapeIndicesTableAsync (driver: IWebDriver) = async {
     let logger: ILogger = LoggerContext.GetLoggerByName "Scraper"
     
     let operation = async {
-        logger.LogInformation("🚀 Starting ConstructIndexCache for {IndexType} (forceRefresh: {ForceRefresh})", indexType, forceRefresh)
+        logger.LogInformation("🚀 Starting to scrape PSX indices table")
+        driver.Navigate().GoToUrl "https://dps.psx.com.pk/indices"
+        logger.LogInformation("✅ Navigated to PSX indices page")
+        
+        // Wait for the indices table to load
+        let! tableElement = WaitForElementAsync driver (By.CssSelector "table.tbl") 15.0
+        
+        match tableElement with
+        | Error err -> 
+            logger.LogError("Failed to find indices table")
+            return Error err
+        | Ok table ->
+            // Find all rows in the table body
+            let rows = table.FindElements(By.CssSelector "tbody.tbl__body tr")
+            logger.LogInformation("📊 Found {Count} index rows", rows.Count)
+            
+            let indices = 
+                rows 
+                |> Seq.toList
+                |> List.choose (fun row ->
+                    try
+                        let cells = row.FindElements(By.TagName("td"))
+                        if cells.Count >= 6 then
+                            // Extract index name and code from the first cell
+                            let firstCell = cells.[0]
+                            
+                            // Try to find a clickable link first, fallback to bold text
+                            let (name, code) = 
+                                try
+                                    let linkElement = firstCell.FindElement(By.CssSelector "a.link")
+                                    let code = linkElement.GetAttribute("data-code")
+                                    let name = linkElement.Text.Trim()
+                                    (name, code)
+                                with
+                                | :? OpenQA.Selenium.NoSuchElementException ->
+                                    // Fallback for rows without links (like HBLTTI)
+                                    let boldElement = firstCell.FindElement(By.CssSelector "b")
+                                    let name = boldElement.Text.Trim()
+                                    // For non-clickable indices, use the name as code
+                                    (name, name)
+                                | _ ->
+                                    // Last resort: just get the text content
+                                    let name = firstCell.Text.Trim()
+                                    (name, name)
+                            
+                            // Parse numeric values
+                            let highText = cells.[1].Text.Trim().Replace(",", "")
+                            let lowText = cells.[2].Text.Trim().Replace(",", "")
+                            let currentText = cells.[3].Text.Trim().Replace(",", "")
+                            let changeText = cells.[4].Text.Trim().Replace(",", "").Replace(" ", "")
+                            let changePercentText = cells.[5].Text.Trim().Replace("%", "").Replace(" ", "")
+                            
+                            // Try to parse the values, handle "N/A" and other non-numeric values
+                            let parseDecimal (text: string) = 
+                                let cleanText = text.Replace("N/A", "").Replace(" ", "").Trim()
+                                if String.IsNullOrEmpty(cleanText) then None
+                                else
+                                    match System.Decimal.TryParse(cleanText) with
+                                    | true, value -> Some value
+                                    | false, _ -> None
+                            
+                            let high = parseDecimal highText
+                            let low = parseDecimal lowText
+                            let current = parseDecimal currentText
+                            let change = parseDecimal changeText
+                            let changePercent = parseDecimal changePercentText
+                            
+                            match high, low, current, change, changePercent with
+                            | Some h, Some l, Some c, Some ch, Some cp ->
+                                Some {
+                                    Name = name
+                                    Code = code
+                                    Current = c
+                                    Change = ch
+                                    ChangePercent = cp
+                                    High = h
+                                    Low = l
+                                }
+                            | _ ->
+                                logger.LogWarning("❌ Could not parse values for index {Name}", name)
+                                None
+                        else
+                            logger.LogWarning("❌ Row has insufficient cells: {CellCount}", cells.Count)
+                            None
+                    with
+                    | ex ->
+                        logger.LogError(ex, "❌ Error processing index row")
+                        None)
+            
+            logger.LogInformation("✅ Successfully extracted {Count} indices", List.length indices)
+            return Ok indices
+    }
+    
+    try
+        let! result = Retry.withPageRetry (fun () -> operation)
+        return result
+    with
+    | ex -> 
+        logger.LogError(ex, "Error scraping indices table after retries")
+        return Error (DataExtractionError $"Failed to scrape indices table: {ex.Message}")
+}
+
+// Restored version with database operations
+let ConstructIndexCache (forceRefresh: bool) (indexCode: string) = async {
+    let logger: ILogger = LoggerContext.GetLoggerByName "Scraper"
+    
+    let operation = async {
+        logger.LogInformation("🚀 Starting ConstructIndexCache for {IndexCode} (forceRefresh: {ForceRefresh})", indexCode, forceRefresh)
         use driver = CreateChromeDriver ()
         
         let url = "https://dps.psx.com.pk/indices"
-        let code = match indexType with | KSE30 -> "KSE30" | KSE100 -> "KSE100"
-        logger.LogInformation("🎯 Target URL: {Url}, Index Code: {Code}", url, code)
+        logger.LogInformation("🎯 Target URL: {Url}, Index Code: {Code}", url, indexCode)
         
-        let! result = ScrapeIndexDataAsync driver url code
+        let! result = ScrapeIndexDataAsync driver url indexCode
         
         match result with
         | Ok (stockData: ScrapedIndexData list) ->

@@ -43,9 +43,22 @@ type CurrentPortfolio = {
     Price: decimal 
 }
 
-type IndexType = 
+// New type for index information from PSX
+type IndexInfo = {
+    Name: string
+    Code: string
+    Current: decimal
+    Change: decimal
+    ChangePercent: decimal
+    High: decimal
+    Low: decimal
+}
+
+// New type for index selection
+type IndexSelection = 
     | KSE30
     | KSE100
+    | Both
 
 // Type for scraped index data
 type ScrapedIndexData = {

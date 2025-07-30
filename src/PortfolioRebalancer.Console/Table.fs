@@ -30,8 +30,9 @@ let showSimpleCurrentPortfolio () = async {
         |> List.sortByDescending (fun s -> s.Weight)
         |> List.map (fun s ->
             let price = Map.tryFind s.Symbol priceMap |> Option.defaultValue 0m
-            let weightPct = toPercentage s.Weight
-            s.Symbol, weightPct, formatPKR price)
+            let weightPct = s.Weight * 100m
+            let weightDisplay = sprintf "%.2f%%" weightPct
+            s.Symbol, weightDisplay, formatPKR price)
     
     match indexRows with
     | [] -> 
@@ -414,3 +415,28 @@ let showRebalanceCurrentPortfolioResult
     
     AnsiConsole.Write finalSummaryTable
     logger.LogInformation("Portfolio display completed successfully")
+
+let displayIndicesTable (indices: IndexInfo list) =
+    let table = 
+        Table()
+            .Title("[bold green]PSX Market Indices[/]")
+            .AddColumns([|"Index"; "Current"; "Change"; "% Change"; "High"; "Low"|])
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Green)
+    
+    indices 
+    |> List.iter (fun index ->
+        let changeIcon = if index.Change >= 0m then "▲" else "▼"
+        let changeText = sprintf "%s %.2f" changeIcon (abs index.Change)
+        let changePercentText = sprintf "%s %.2f%%" changeIcon (abs index.ChangePercent)
+        
+        table.AddRow(
+            index.Name,
+            sprintf "%.2f" index.Current,
+            changeText,
+            changePercentText,
+            sprintf "%.2f" index.High,
+            sprintf "%.2f" index.Low
+        ) |> ignore)
+    
+    AnsiConsole.Write(table)

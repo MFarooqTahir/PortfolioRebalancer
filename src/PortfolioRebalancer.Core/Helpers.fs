@@ -30,11 +30,10 @@ let (|ValidWeight|_|) (str: string) =
     let cleanStr = str.Replace("%", "").Trim()
     match Decimal.TryParse(cleanStr) with
     | true, weight when weight > 0m -> 
-        if weight > 1m then
-            let result = weight / 100m
-            Some result
-        else
-            Some weight
+        // Always convert to fraction (divide by 100)
+        // This handles both cases: "9.57%" -> 0.0957 and "95" -> 0.95
+        let result = weight / 100m
+        Some result
     | _ -> 
         None
 
