@@ -17,7 +17,7 @@ let rebalanceAndDisplay
     (index: IndexTableRecord list) 
     (current: CurrentPortfolio list) 
     (prices: StockRecord list) =
-    let logger: ILogger = getModuleLoggerByName "Rebalancer"
+    let logger: ILogger = LoggerContext.GetLoggerByName "Rebalancer"
     
     // Helper functions for better organization
     let findMissingSymbols () = 

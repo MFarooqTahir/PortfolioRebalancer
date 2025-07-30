@@ -123,16 +123,16 @@ let printErrors (result: Result<unit, ScrapingError>) =
 
 let MainMenu() = async {
     try
-        let serviceContainer = createDefaultServiceContainer()
-        initializeLogger serviceContainer
-        
+        createServiceContainer (Some (createConfigurationBuilder()))
+            |> LoggerContext.Initialize
+            
         AnsiConsole.MarkupLine "[bold blue]🚀 Starting Portfolio Rebalancer...[/]"
         
         AnsiConsole.MarkupLine "[cyan]📋 Initializing database...[/]"
         do! ensureTablesAsync()
         AnsiConsole.MarkupLine "[green]✅ Database initialized successfully![/]"
         
-        let rec runMenu (serviceContainer: ServiceContainer) = async {
+        let rec runMenu() = async {
             try
                 displayMenu()
                 let input = Console.ReadLine()
@@ -168,7 +168,10 @@ let MainMenu() = async {
                     
                 | GetData ->
                     AnsiConsole.MarkupLine "\n[green]🌐 Fetching market data...[/]"
+                    let logger: ILogger = LoggerContext.GetLoggerByName "Program"
+                    logger.LogDebug("🔍 Starting data fetch operation...")
                     let! result = ConstructIndexCache true KSE30
+                    logger.LogDebug("✅ Data fetch operation completed")
                     printErrors result
                     return true
                     
@@ -223,7 +226,7 @@ let MainMenu() = async {
         }
 
         let rec runMenuLoop () = async {
-            let! continueRunning = runMenu serviceContainer
+            let! continueRunning = runMenu()
             if continueRunning then
                 do! runMenuLoop()
         }

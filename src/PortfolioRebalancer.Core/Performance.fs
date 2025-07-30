@@ -54,7 +54,7 @@ type PerformanceMetrics = {
 let private performanceMetrics = ConcurrentQueue<PerformanceMetrics>()
 
 let measureOperation<'T> (operationName: string) (operation: unit -> 'T) : 'T =
-    let logger: ILogger = getModuleLoggerByName "Performance"
+    let logger: ILogger = LoggerContext.GetLoggerByName "Performance"
     let stopwatch = Stopwatch.StartNew()
     let timestamp = DateTime.Now
     
@@ -94,20 +94,22 @@ let getPerformanceStats() : PerformanceMetrics list =
 
 // Clear old metrics (older than specified hours)
 let clearOldMetrics (hoursOld: int) =
-    let logger: ILogger = getModuleLoggerByName "Performance"
+    let logger: ILogger = LoggerContext.GetLoggerByName "Performance"
     let cutoffTime = DateTime.Now.AddHours(-float hoursOld)
-    let mutable removed = 0
-    let mutable shouldContinue = true
     
-    while not performanceMetrics.IsEmpty && shouldContinue do
-        match performanceMetrics.TryDequeue() with
-        | true, metric when metric.Timestamp < cutoffTime ->
-            removed <- removed + 1
-        | true, metric ->
-            // Put it back if it's not old enough
-            performanceMetrics.Enqueue(metric)
-            shouldContinue <- false
-        | false, _ -> 
-            shouldContinue <- false
+    let rec processMetrics (removed: int) : int =
+        if performanceMetrics.IsEmpty then
+            removed
+        else
+            match performanceMetrics.TryDequeue() with
+            | true, metric when metric.Timestamp < cutoffTime ->
+                processMetrics (removed + 1)
+            | true, metric ->
+                // Put it back if it's not old enough
+                performanceMetrics.Enqueue(metric)
+                removed
+            | false, _ -> 
+                removed
     
+    let removed = processMetrics 0
     logger.LogInformation("Cleared {Count} old performance metrics", removed) 

@@ -10,9 +10,23 @@ A comprehensive F# application for portfolio rebalancing with support for index-
    ```
 
 2. **Build & Run:**
+   
+   **Option A: Using the provided scripts (Recommended)**
+   ```bash
+   # Windows PowerShell
+   .\run-dev.ps1
+   
+   # Windows Command Prompt
+   run-dev.bat
+   
+   # Linux/macOS/WSL
+   ./run-dev.sh
+   ```
+   
+   **Option B: Manual command**
    ```bash
    dotnet build
-   dotnet run --project src/PortfolioRebalancer.Console/
+   $env:ASPNETCORE_ENVIRONMENT="Development"; dotnet run --project src/PortfolioRebalancer.Console/
    ```
 
 3. **Get Started:**
@@ -34,6 +48,7 @@ A comprehensive F# application for portfolio rebalancing with support for index-
 - **⚙️ Configuration Management**: JSON-based configuration with environment support
 - **🏗️ Modular Architecture**: Clean separation of concerns across multiple projects
 - **🧹 Clean Code**: Eliminated code duplication and optimized patterns
+- **🔄 Retry Policies**: Automatic retry with exponential backoff for transient failures
 
 ## 📊 Performance & Monitoring
 
@@ -218,6 +233,7 @@ PortfolioRebalancer/
 - **ServiceContainer.fs** - Dependency injection with Serilog integration
 - **Logger.fs** - Best practice logging patterns (module-level, functional injection)
 - **Performance.fs** - Caching and metrics system
+- **Resilience.fs** - Retry policies with exponential backoff for transient failures
 
 ### Data Layer
 
@@ -307,6 +323,54 @@ docker stop portfolio-postgres
 $env:DOTNET_ENVIRONMENT="Development"
 $env:DOTNET_ENVIRONMENT="Production"
 ```
+
+### Debugging Scraping Issues
+
+If you encounter scraping issues, the application now includes comprehensive debug logging and retry policies:
+
+1. **Debug logging is enabled in development mode** - All scraping operations are logged with detailed information
+2. **Page state logging** - Shows current URL, page title, and all elements with data-code attributes
+3. **Element search debugging** - Multiple selector strategies with detailed timing information
+4. **ChromeDriver optimization** - Reduced noise and improved stability with additional Chrome options
+5. **Retry policies** - Automatic retry with exponential backoff for transient failures
+
+**To debug scraping issues:**
+
+```bash
+# Run with debug logging (already enabled in development)
+dotnet run --project src/PortfolioRebalancer.Console/
+
+# Or use the standalone debug script
+dotnet fsi debug_scraper.fsx
+```
+
+**Debug output includes:**
+- 🔍 Element search attempts with timing
+- 📊 Page state analysis at each step
+- ⏳ Page load progress and retry logic
+- ✅ Success/failure indicators for each operation
+- 📋 HTML structure previews for debugging
+- 🚀 Step-by-step execution flow
+- 🔄 Retry attempts with exponential backoff
+
+**Retry Policies:**
+- **FastUI** (3 retries, 1-5s delays) - For clicking and navigation
+- **ElementFinding** (5 retries, 2-15s delays) - For finding elements
+- **PageLoading** (3 retries, 3-20s delays) - For page loads and data extraction
+- **Critical** (7 retries, 1-30s delays) - For important operations
+
+**Retry Coverage:**
+- **Database Operations** - All read/write operations with critical retry
+- **Web Scraping** - Element finding, page loading, and data extraction
+- **Portfolio Import/Export** - File operations and database persistence
+- **ChromeDriver Operations** - Navigation, clicking, and JavaScript execution
+
+**Common issues and solutions:**
+- **Element not found**: Check debug logs for page state and available elements
+- **ChromeDriver errors**: Reduced noise with optimized Chrome options
+- **Page load timeouts**: Enhanced retry logic with page content validation
+- **JavaScript issues**: Removed JavaScript disabling to allow dynamic content loading
+- **Transient failures**: Automatic retry with exponential backoff
 
 ### Project Dependencies
 

@@ -9,7 +9,7 @@ open PortfolioRebalancer.Data.Db
 open Spectre.Console
 
 let showSimpleCurrentPortfolio () = async {
-    let logger: ILogger = getModuleLoggerByName "Table"
+    let logger: ILogger = LoggerContext.GetLoggerByName "Table"
     logger.LogInformation("Loading portfolio data for display")
     let! indexRecords = getIndexRecordsAsync()
     let! stockRecords = getStockRecordsAsync()
@@ -220,7 +220,7 @@ let showRebalanceCurrentPortfolioResult
     (includeCommission: bool)
     (cash: decimal) =
     
-    let logger: ILogger = getModuleLoggerByName "Table"
+    let logger: ILogger = LoggerContext.GetLoggerByName "Table"
     logger.LogInformation("Displaying current portfolio rebalancing results with {SellCount} sells, {BuyCount} buys, {FinalCount} final positions", sells.Length, buys.Length, final.Length)
     
     // Display sell orders with enhanced styling

@@ -13,6 +13,8 @@ let createConfigurationBuilder() : IConfigurationBuilder =
     let possiblePaths = [
         IO.Directory.GetCurrentDirectory()
         IO.Path.GetDirectoryName(Reflection.Assembly.GetExecutingAssembly().Location)
+        IO.Path.Combine(IO.Directory.GetCurrentDirectory(), "src", "PortfolioRebalancer.Console")
+        IO.Path.Combine(IO.Directory.GetCurrentDirectory(), "PortfolioRebalancer.Tests")
         IO.Path.Combine(IO.Directory.GetCurrentDirectory(), "..", "PortfolioRebalancer.Console")
         IO.Path.Combine(IO.Directory.GetCurrentDirectory(), "..", "PortfolioRebalancer.Tests")
     ]
@@ -23,11 +25,20 @@ let createConfigurationBuilder() : IConfigurationBuilder =
             IO.File.Exists(IO.Path.Combine(path, "appsettings.json")))
         |> Option.defaultValue (IO.Directory.GetCurrentDirectory())
     
+
+    
+    // Get the environment from environment variables
+    let environment = 
+        Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+        |> Option.ofObj
+        |> Option.defaultValue "Production"
+    
+
+    
     builder
         .SetBasePath(basePath)
         .AddJsonFile("appsettings.json", optional = true, reloadOnChange = true)
-        .AddJsonFile("appsettings.Development.json", optional = true, reloadOnChange = true)
-        .AddJsonFile("appsettings.Production.json", optional = true, reloadOnChange = true)
+        .AddJsonFile(sprintf "appsettings.%s.json" environment, optional = true, reloadOnChange = true)
         .AddEnvironmentVariables()
 
 // Global configuration instance

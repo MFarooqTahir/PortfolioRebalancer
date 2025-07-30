@@ -19,18 +19,27 @@ let toPercentage (value: decimal) =
     value.ToString "P2"
 
 let (|ValidDecimal|_|) (str: string) =
-    match Decimal.TryParse(str.Replace(",", "")) with
-    | true, value -> Some value
-    | _ -> None
+    let cleanStr = str.Replace(",", "")
+    match Decimal.TryParse(cleanStr) with
+    | true, value -> 
+        Some value
+    | _ -> 
+        None
 
 let (|ValidWeight|_|) (str: string) =
     let cleanStr = str.Replace("%", "").Trim()
     match Decimal.TryParse(cleanStr) with
-    | true, weight when weight > 0m -> Some (weight / 100m)
-    | _ -> None
+    | true, weight when weight > 0m -> 
+        if weight > 1m then
+            let result = weight / 100m
+            Some result
+        else
+            Some weight
+    | _ -> 
+        None
 
 let calculateCommission sharePrice quantity =
-    if sharePrice < Configuration.Commission.MinimumPrice then
-        Configuration.Commission.FixedRate * decimal quantity
+    if sharePrice < Commission.MinimumPrice then
+        Commission.FixedRate * decimal quantity
     else
-        sharePrice * decimal quantity * Configuration.Commission.PercentageRate
+        sharePrice * decimal quantity * Commission.PercentageRate

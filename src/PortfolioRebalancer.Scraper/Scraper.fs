@@ -9,6 +9,7 @@ open OpenQA.Selenium.Chrome
 open OpenQA.Selenium.Support.UI
 open PortfolioRebalancer.Core.Types
 open PortfolioRebalancer.Core.Helpers
+open PortfolioRebalancer.Core.Resilience
 open PortfolioRebalancer.Data.Db
 open Microsoft.Extensions.Logging
 open PortfolioRebalancer.Core.Logger
@@ -27,74 +28,106 @@ let CreateChromeDriver () =
     options.AddArgument("--disable-features=VizDisplayCompositor")
     options.AddArgument("--window-size=1920,1080")
     
-    let logger: ILogger = getModuleLoggerByName "Scraper"
+    let logger: ILogger = LoggerContext.GetLoggerByName "Scraper"
     logger.LogInformation("Creating ChromeDriver with headless configuration...")
     let driver = new ChromeDriver(options)
     logger.LogInformation("ChromeDriver created successfully")
     driver
 
 let WaitForElementAsync (driver: IWebDriver) (by: By) (timeoutSeconds: float) = async {
-    let logger: ILogger = getModuleLoggerByName "Scraper"
-    logger.LogDebug("Waiting for element: {Element} (timeout: {Timeout} seconds)", by, timeoutSeconds)
-    let wait = WebDriverWait(driver, TimeSpan.FromSeconds(timeoutSeconds))
-    try
+    let logger: ILogger = LoggerContext.GetLoggerByName "Scraper"
+    logger.LogDebug("🔍 Waiting for element: {Element} (timeout: {Timeout} seconds)", by, timeoutSeconds)
+    
+    let operation = async {
+        let wait = WebDriverWait(driver, TimeSpan.FromSeconds(timeoutSeconds))
         let element = wait.Until(fun d -> d.FindElement(by))
-        logger.LogDebug("Element found successfully: {Element}", by)
+        logger.LogDebug("✅ Element found successfully: {Element}", by)
+        return element
+    }
+    
+    try
+        let! element = Retry.withElementRetry (fun () -> operation)
         return Ok element
     with
     | ex -> 
-        logger.LogError(ex, "Element not found after {Timeout} seconds: {Element}", timeoutSeconds, by)
+        logger.LogError(ex, "❌ Element not found after retries: {Element}", by)
         return Error (ElementNotFound ex.Message)
 }
 
 let ExecuteScriptAsync<'T> (driver: IWebDriver) (script: string) (args: obj array) = async {
-    let logger: ILogger = getModuleLoggerByName "Scraper"
-    logger.LogDebug("Executing JavaScript: {Script}", script)
-    try
+    let logger: ILogger = LoggerContext.GetLoggerByName "Scraper"
+    logger.LogDebug("🔄 Executing JavaScript: {Script}", script)
+    
+    let operation = async {
         let result = (driver :?> IJavaScriptExecutor).ExecuteScript(script, args)
-        logger.LogDebug("JavaScript executed successfully")
-        return Ok (unbox<'T> result)
+        logger.LogDebug("✅ JavaScript executed successfully")
+        return unbox<'T> result
+    }
+    
+    try
+        let! result = Retry.withFastRetry (fun () -> operation)
+        return Ok result
     with
     | ex -> 
-        logger.LogError(ex, "JavaScript execution failed: {Script}", script)
+        logger.LogError(ex, "❌ JavaScript execution failed: {Script}", script)
         return Error (DataExtractionError ex.Message)
 }
 
 let ExtractStockDataFromTable (rows: ReadOnlyCollection<IWebElement>) =
-    let logger: ILogger = getModuleLoggerByName "Scraper"
+    let logger: ILogger = LoggerContext.GetLoggerByName "Scraper"
     try
+        logger.LogDebug("🔍 Extracting data from {RowCount} rows", rows.Count)
+        
         let stockData = 
             rows 
             |> Seq.toList
-            |> List.choose (fun row ->
+            |> List.mapi (fun index row ->
                 let cells = row.FindElements(By.TagName("td"))
-                if cells.Count >= 4 then
+                logger.LogDebug("Row {Index}: Found {CellCount} cells", index, cells.Count)
+                
+                // Log all cells for debugging
+                for i in 0..(cells.Count - 1) do
+                    let cellText = cells.[i].Text.Trim()
+                    logger.LogDebug("Row {Index} Cell {CellIndex}: '{CellText}'", index, i, cellText)
+                
+                if cells.Count >= 7 then
                     let symbol = cells.[0].Text.Trim()
-                    let weightText = cells.[1].Text.Trim()
-                    let priceText = cells.[2].Text.Trim()
-                    let name = cells.[3].Text.Trim()
+                    let name = cells.[1].Text.Trim()
+                    let priceText = cells.[3].Text.Trim()  // CURRENT column
+                    let weightText = cells.[6].Text.Trim() // IDX WTG (%) column
+                    
+                    logger.LogDebug("Row {Index}: Symbol='{Symbol}', Name='{Name}', Price='{Price}', Weight='{Weight}'", 
+                        index, symbol, name, priceText, weightText)
                     
                     match weightText, priceText with
                     | ValidWeight weight, ValidDecimal price when not (String.IsNullOrEmpty(symbol)) ->
+                        logger.LogDebug("✅ Row {Index}: Valid data extracted", index)
                         Some {
                             Symbol = symbol
                             Weight = weight
                             Price = price
                             Name = name
                         }
-                    | _, _ -> None
-                else None)
+                    | _, _ -> 
+                        logger.LogDebug("❌ Row {Index}: Invalid data - Weight='{Weight}', Price='{Price}'", index, weightText, priceText)
+                        None
+                else 
+                    logger.LogDebug("❌ Row {Index}: Not enough cells ({CellCount} < 4)", index, cells.Count)
+                    None)
+            |> List.choose id
         
+        logger.LogDebug("📊 Extracted {Count} valid records out of {Total} rows", List.length stockData, rows.Count)
         Ok stockData
     with
     | ex -> Error (DataExtractionError ex.Message)
 
 let ScrapeIndexDataAsync (driver: IWebDriver) (url: string) (code: string) = async {
-    let logger: ILogger = getModuleLoggerByName "Scraper"
-    try
-        logger.LogInformation("Starting to scrape index data for {Code} from: {Url}", code, url)
+    let logger: ILogger = LoggerContext.GetLoggerByName "Scraper"
+    
+    let operation = async {
+        logger.LogInformation("🚀 Starting to scrape index data for {Code} from: {Url}", code, url)
         driver.Navigate().GoToUrl url
-        logger.LogInformation("Navigated to: {Url}", url)
+        logger.LogInformation("✅ Navigated to: {Url}", url)
         logger.LogDebug("Current page title: {Title}", driver.Title)
         logger.LogDebug("Current page URL: {Url}", driver.Url)
 
@@ -145,6 +178,14 @@ let ScrapeIndexDataAsync (driver: IWebDriver) (url: string) (code: string) = asy
                         return Error err
                     | Ok table ->
                         logger.LogDebug("Found data table, extracting rows...")
+                        
+                        // Extract and log table headers
+                        let headers = table.FindElements(By.CssSelector("thead th"))
+                        logger.LogDebug("Table headers found: {Count} columns", headers.Count)
+                        for i in 0..(headers.Count - 1) do
+                            let headerText = headers.[i].Text.Trim()
+                            logger.LogDebug("🔍 Table Header {Index}: '{HeaderText}'", i, headerText)
+                        
                         let rows = table.FindElements(By.CssSelector("tbody tr"))
                         logger.LogInformation("Found {Count} rows in table", rows.Count)
                         let htmlLength = table.GetAttribute("outerHTML").Length
@@ -167,15 +208,21 @@ let ScrapeIndexDataAsync (driver: IWebDriver) (url: string) (code: string) = asy
                             let firstFew = stockData |> List.take takeCount
                             logger.LogDebug("First few records: {Records}", firstFew)
                             return Ok stockData
+    }
+    
+    try
+        let! result = Retry.withPageRetry (fun () -> operation)
+        return result
     with
     | ex -> 
-        logger.LogError(ex, "Scraping error occurred")
+        logger.LogError(ex, "❌ Scraping error occurred after retries")
         return Error (NavigationError $"Scraping error: {ex.Message}")
 }
 
 let GetStockFromPSXAsync (driver: IWebDriver) (symbol: string) = async {
-    let logger: ILogger = getModuleLoggerByName "Scraper"
-    try
+    let logger: ILogger = LoggerContext.GetLoggerByName "Scraper"
+    
+    let operation = async {
         let url = sprintf "https://dps.psx.com.pk/company/%s" symbol
         driver.Navigate().GoToUrl url
         logger.LogDebug("Fetching price for {Symbol} from {Url}", symbol, url)
@@ -209,48 +256,108 @@ let GetStockFromPSXAsync (driver: IWebDriver) (symbol: string) = async {
         | _, Error err -> 
             logger.LogWarning("Could not find name element for {Symbol}", symbol)
             return Error err
+    }
+    
+    try
+        let! result = Retry.withPageRetry (fun () -> operation)
+        return result
     with
     | ex -> 
-        logger.LogError(ex, "Error getting price for {Symbol}", symbol)
+        logger.LogError(ex, "Error getting price for {Symbol} after retries", symbol)
         return Error (DataExtractionError $"Failed to get price for {symbol}: {ex.Message}")
 }
 
 // Restored version with database operations
 let ConstructIndexCache (forceRefresh: bool) (indexType: IndexType) = async {
-    let logger: ILogger = getModuleLoggerByName "Scraper"
-    try
-        logger.LogInformation("Starting ConstructIndexCache for {IndexType} (forceRefresh: {ForceRefresh})", indexType, forceRefresh)
+    let logger: ILogger = LoggerContext.GetLoggerByName "Scraper"
+    
+    let operation = async {
+        logger.LogInformation("🚀 Starting ConstructIndexCache for {IndexType} (forceRefresh: {ForceRefresh})", indexType, forceRefresh)
         use driver = CreateChromeDriver ()
         
-        let url = "https://www.psx.com.pk/psx/resources-and-tools/indices/kse-mis"
+        let url = "https://dps.psx.com.pk/indices"
         let code = match indexType with | KSE30 -> "KSE30" | KSE100 -> "KSE100"
-        logger.LogInformation("Target URL: {Url}, Index Code: {Code}", url, code)
+        logger.LogInformation("🎯 Target URL: {Url}, Index Code: {Code}", url, code)
         
         let! result = ScrapeIndexDataAsync driver url code
         
         match result with
-        | Ok stockData ->
+        | Ok (stockData: ScrapedIndexData list) ->
+            logger.LogInformation("✅ Index scraping completed successfully with {Count} records", List.length stockData)
+            
             // Convert to IndexTableRecord list
             let indexRecords = 
                 stockData 
                 |> List.map (fun data -> 
                     { Symbol = data.Symbol; Weight = data.Weight })
             
-            // Convert to StockRecord list
-            let stockRecords = 
+            // Convert to StockRecord list from index data
+            let indexStockRecords = 
                 stockData 
                 |> List.map (fun data -> 
                     { Symbol = data.Symbol; Name = data.Name; Price = data.Price })
             
-            // Save to database
-            do! setIndexRecordsAsync indexRecords
-            do! setStockRecordsAsync stockRecords
+            // Get current portfolio to find stocks not in index
+            let! currentPortfolio = getCurrentPortfolioAsync()
+            logger.LogDebug("📊 Found {Count} stocks in current portfolio", List.length currentPortfolio)
             
-            logger.LogInformation "Cache constructed"
+            // Find stocks in portfolio but not in index
+            let indexSymbols = Set.ofList (stockData |> List.map _.Symbol )
+            let portfolioOnlySymbols = 
+                currentPortfolio 
+                |> List.filter (fun p -> not (Set.contains p.Symbol indexSymbols))
+                |> List.map (fun p -> p.Symbol)
+            
+            logger.LogDebug("🔍 Found {Count} stocks in portfolio but not in index: {Symbols}", 
+                List.length portfolioOnlySymbols, String.concat ", " portfolioOnlySymbols)
+            
+            // Fetch individual prices for portfolio-only stocks
+            let! portfolioStockRecords = 
+                if List.isEmpty portfolioOnlySymbols then
+                    async { return [] }
+                else
+                    async {
+                        logger.LogInformation("🌐 Fetching individual prices for {Count} portfolio-only stocks", List.length portfolioOnlySymbols)
+                        let mutable results = []
+                        for symbol in portfolioOnlySymbols do
+                            let! priceResult = GetStockFromPSXAsync driver symbol
+                            match priceResult with
+                            | Ok (price, name) ->
+                                let record = { Symbol = symbol; Name = name; Price = price }
+                                results <- record :: results
+                                logger.LogDebug("✅ Fetched price for {Symbol}: {Price}", symbol, formatPKR price)
+                            | Error err ->
+                                logger.LogWarning("❌ Failed to fetch price for {Symbol}: {Error}", symbol, err.ToString())
+                        return results
+                    }
+            
+            // Combine all stock records
+            let allStockRecords = indexStockRecords @ portfolioStockRecords
+            
+            logger.LogDebug("💾 Saving {IndexCount} index records and {StockCount} stock records to database", 
+                List.length indexRecords, List.length allStockRecords)
+            
+            // Save to database only if we have records
+            if List.isEmpty indexRecords && List.isEmpty allStockRecords then
+                logger.LogWarning("⚠️ No data to save - both index and stock records are empty")
+            else
+                if not (List.isEmpty indexRecords) then
+                    do! setIndexRecordsAsync indexRecords
+                if not (List.isEmpty allStockRecords) then
+                    do! setStockRecordsAsync allStockRecords
+            
+            logger.LogInformation("✅ Cache constructed successfully with {TotalStocks} total stocks", List.length allStockRecords)
             return Ok ()
-        | Error err -> return Error err
+        | Error err -> 
+            logger.LogError("❌ Scraping failed: {Error}", err.ToString())
+            return Error err
+    }
+    
+    try
+        let! result = Retry.withCriticalRetry (fun () -> operation)
+        return result
     with
     | ex -> 
-        logger.LogError(ex, "Navigation error in ConstructIndexCache")
+        logger.LogError(ex, "❌ Unexpected error in ConstructIndexCache after retries")
         return Error (NavigationError ex.Message)
 }

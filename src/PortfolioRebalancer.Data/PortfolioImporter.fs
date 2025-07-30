@@ -5,6 +5,7 @@ open System.IO
 open System.Text.Json
 open System.Text.Json.Serialization
 open PortfolioRebalancer.Core.Types
+open PortfolioRebalancer.Core.Resilience
 open PortfolioRebalancer.Data.Db
 open Microsoft.Extensions.Logging
 open PortfolioRebalancer.Core.Logger
@@ -14,7 +15,7 @@ do
     options.PropertyNamingPolicy <- JsonNamingPolicy.CamelCase
     JsonFSharpOptions.Default().WithUnionAdjacentTag().AddToJsonSerializerOptions(options)
 let importCurrentPortfolioFromJson (filePath: string) = async {
-    let logger: ILogger = getModuleLoggerByName "PortfolioImporter"
+    let logger: ILogger = LoggerContext.GetLoggerByName "PortfolioImporter"
     logger.LogInformation("Starting portfolio import from: {FilePath}", filePath)
     // Check if file exists
     if not (File.Exists filePath) then
@@ -68,23 +69,32 @@ let importCurrentPortfolioFromJson (filePath: string) = async {
         let errorMsg = "Validation errors found:\n" + (String.concat "\n" validationErrors)
         failwith errorMsg
     // Import to database (only stocks, not ETFs)
-    do! setCurrentPortfolioAsync stocks
-    logger.LogInformation("Current portfolio imported and saved to database.")
-    logger.LogInformation("  - File: {FilePath}", filePath)
-    logger.LogInformation("  - Stocks imported: {Count}", stocks.Length)
-    logger.LogInformation("  - ETFs excluded: {Count}", etfs.Length)
-    logger.LogInformation("  - Total value: {Value}", stocks |> List.sumBy (fun r -> decimal r.Shares * r.Price))
+    let operation = async {
+        do! setCurrentPortfolioAsync stocks
+        logger.LogInformation("Current portfolio imported and saved to database.")
+        logger.LogInformation("  - File: {FilePath}", filePath)
+        logger.LogInformation("  - Stocks imported: {Count}", stocks.Length)
+        logger.LogInformation("  - ETFs excluded: {Count}", etfs.Length)
+        logger.LogInformation("  - Total value: {Value}", stocks |> List.sumBy (fun r -> decimal r.Shares * r.Price))
+    }
+    
+    do! Retry.withCriticalRetry (fun () -> operation)
     return ()
 }
 
 let exportCurrentPortfolioToJson (filePath: string) = async {
-    let logger: ILogger = getModuleLoggerByName "PortfolioImporter"
+    let logger: ILogger = LoggerContext.GetLoggerByName "PortfolioImporter"
     logger.LogInformation("Starting portfolio export to: {FilePath}", filePath)
-    let! portfolio = getCurrentPortfolioAsync()
-    let jsonContent = JsonSerializer.Serialize(portfolio, options)
-    File.WriteAllText(filePath, jsonContent)
-    logger.LogInformation("Current portfolio exported successfully.")
-    logger.LogInformation("  - File: {FilePath}", filePath)
-    logger.LogInformation("  - Records exported: {Count}", portfolio.Length)
+    
+    let operation = async {
+        let! portfolio = getCurrentPortfolioAsync()
+        let jsonContent = JsonSerializer.Serialize(portfolio, options)
+        File.WriteAllText(filePath, jsonContent)
+        logger.LogInformation("Current portfolio exported successfully.")
+        logger.LogInformation("  - File: {FilePath}", filePath)
+        logger.LogInformation("  - Records exported: {Count}", portfolio.Length)
+    }
+    
+    do! Retry.withPageRetry (fun () -> operation)
     return ()
 }
