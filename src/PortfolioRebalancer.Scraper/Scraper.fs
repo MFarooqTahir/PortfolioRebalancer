@@ -1,8 +1,6 @@
 ﻿module PortfolioRebalancer.Scraper.Scraper
 
 open System
-open System.Threading
-open System.Collections.Generic
 open System.Collections.ObjectModel
 open OpenQA.Selenium
 open OpenQA.Selenium.Chrome
@@ -16,30 +14,21 @@ open PortfolioRebalancer.Core.Logger
 
 let CreateChromeDriver () =
     let options = ChromeOptions()
-    options.AddArgument("--headless")
-    options.AddArgument("--no-sandbox")
-    options.AddArgument("--disable-dev-shm-usage")
-    options.AddArgument("--disable-gpu")
-    options.AddArgument("--disable-extensions")
-    options.AddArgument("--disable-plugins")
-    options.AddArgument("--disable-images")
-    options.AddArgument("--disable-web-security")
-    options.AddArgument("--disable-features=VizDisplayCompositor")
-    options.AddArgument("--window-size=1920,1080")
-    options.AddArgument("--log-level=3")  // Suppress Chrome logging
-    options.AddArgument("--silent")
-    options.AddArgument("--disable-logging")
-    options.AddArgument("--disable-dev-tools")
-    options.AddArgument("--disable-background-timer-throttling")
-    options.AddArgument("--disable-backgrounding-occluded-windows")
-    options.AddArgument("--disable-renderer-backgrounding")
-    options.AddArgument("--disable-features=TranslateUI")
-    options.AddArgument("--disable-ipc-flooding-protection")
+    options.AddArgument "--headless"
+    options.AddArgument "--no-sandbox"
+    options.AddArgument "--disable-dev-shm-usage"
+    options.AddArgument "--disable-extensions"
+    options.AddArgument "--disable-plugins"
+    options.AddArgument "--disable-images"
+    options.AddArgument "--disable-web-security"
+    options.AddArgument "--disable-features=VizDisplayCompositor"
+    options.AddArgument "--log-level=3"
+    options.AddArgument "--disable-logging"
     options.SetLoggingPreference(LogType.Browser, LogLevel.Off)
     let logger: ILogger = LoggerContext.GetLoggerByName "Scraper"
-    logger.LogInformation("Creating ChromeDriver with headless configuration...")
+    logger.LogInformation "Creating ChromeDriver with headless configuration..."
     let driver = new ChromeDriver(options)
-    logger.LogInformation("ChromeDriver created successfully")
+    logger.LogInformation "ChromeDriver created successfully"
     driver
 
 let WaitForElementAsync (driver: IWebDriver) (by: By) (timeoutSeconds: float) = async {
@@ -68,7 +57,7 @@ let ExecuteScriptAsync<'T> (driver: IWebDriver) (script: string) (args: obj arra
     
     let operation = async {
         let result = (driver :?> IJavaScriptExecutor).ExecuteScript(script, args)
-        logger.LogDebug("✅ JavaScript executed successfully")
+        logger.LogDebug "✅ JavaScript executed successfully"
         return unbox<'T> result
     }
     
