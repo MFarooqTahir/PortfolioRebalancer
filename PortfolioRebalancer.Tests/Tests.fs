@@ -818,8 +818,62 @@ let ``Very high prices should be handled correctly`` () =
         Assert.True(rebalanceResult.Orders.Length >= 0, "Should handle very high prices")
     | Error _ -> Assert.True(false, "Should handle very high prices")
 
+[<Fact>]
+let ``Pagination info parsing should work correctly`` () =
+    let pattern = @"Showing (\d+) to (\d+) of (\d+) entries"
+    let testCases = [
+        ("Showing 1 to 25 of 100 entries", (1, 25, 100))
+        ("Showing 26 to 50 of 100 entries", (26, 50, 100))
+        ("Showing 51 to 75 of 100 entries", (51, 75, 100))
+        ("Showing 76 to 100 of 100 entries", (76, 100, 100))
+    ]
+    
+    for (input, expected) in testCases do
+        let regexMatch = System.Text.RegularExpressions.Regex.Match(input, pattern)
+        Assert.True(regexMatch.Success, sprintf "Should match pattern for: %s" input)
+        
+        let currentStart = int regexMatch.Groups.[1].Value
+        let currentEnd = int regexMatch.Groups.[2].Value
+        let totalEntries = int regexMatch.Groups.[3].Value
+        
+        let expectedStart, expectedEnd, expectedTotal = expected
+        Assert.Equal(expectedStart, currentStart)
+        Assert.Equal(expectedEnd, currentEnd)
+        Assert.Equal(expectedTotal, totalEntries)
+        
+        let currentPage = (currentStart - 1) / 100 + 1
+        let totalPages = (totalEntries + 99) / 100
+        
+        match expected with
+        | (1, _, 100) -> Assert.Equal(1, currentPage); Assert.Equal(1, totalPages)
+        | (26, _, 100) -> Assert.Equal(1, currentPage); Assert.Equal(1, totalPages)
+        | (51, _, 100) -> Assert.Equal(1, currentPage); Assert.Equal(1, totalPages)
+        | (76, _, 100) -> Assert.Equal(1, currentPage); Assert.Equal(1, totalPages)
+        | _ -> Assert.True(false, "Unexpected test case")
 
-
-
-
- 
+[<Fact>]
+let ``Pagination page calculation should work correctly`` () =
+    let calculatePageInfo start total =
+        let currentPage = (start - 1) / 100 + 1
+        let totalPages = (total + 99) / 100
+        (currentPage, totalPages)
+    
+    let result1 = calculatePageInfo 1 100
+    Assert.Equal(1, fst result1)
+    Assert.Equal(1, snd result1)
+    
+    let result2 = calculatePageInfo 1 200
+    Assert.Equal(1, fst result2)
+    Assert.Equal(2, snd result2)
+    
+    let result3 = calculatePageInfo 101 200
+    Assert.Equal(2, fst result3)
+    Assert.Equal(2, snd result3)
+    
+    let result4 = calculatePageInfo 1 250
+    Assert.Equal(1, fst result4)
+    Assert.Equal(3, snd result4)
+    
+    let result5 = calculatePageInfo 201 250
+    Assert.Equal(3, fst result5)
+    Assert.Equal(3, snd result5)

@@ -24,10 +24,48 @@ let CreateChromeDriver () =
     options.AddArgument "--disable-features=VizDisplayCompositor"
     options.AddArgument "--log-level=3"
     options.AddArgument "--disable-logging"
+    options.AddArgument "--silent"
+    options.AddArgument "--disable-gpu-logging"
+    options.AddArgument "--disable-logging-redirect"
+    options.AddArgument "--disable-background-timer-throttling"
+    options.AddArgument "--disable-backgrounding-occluded-windows"
+    options.AddArgument "--disable-renderer-backgrounding"
+    options.AddArgument "--disable-features=TranslateUI"
+    options.AddArgument "--disable-ipc-flooding-protection"
+    options.AddArgument "--disable-default-apps"
+    options.AddArgument "--disable-sync"
+    options.AddArgument "--disable-translate"
+    options.AddArgument "--disable-background-networking"
+    options.AddArgument "--disable-component-extensions-with-background-pages"
+    options.AddArgument "--disable-background-mode"
+    options.AddArgument "--disable-client-side-phishing-detection"
+    options.AddArgument "--disable-hang-monitor"
+    options.AddArgument "--disable-prompt-on-repost"
+    options.AddArgument "--disable-domain-reliability"
+    options.AddArgument "--disable-features=AudioServiceOutOfProcess"
+    options.AddArgument "--disable-features=VizDisplayCompositor"
+    options.AddArgument "--disable-features=TranslateUI"
+    options.AddArgument "--disable-features=BlinkGenPropertyTrees"
+    options.AddArgument "--disable-features=CalculateNativeWinOcclusion"
+    options.AddArgument "--disable-features=GlobalMediaControls"
+    options.AddArgument "--disable-features=MediaRouter"
+    options.AddArgument "--disable-features=OptimizationHints"
+    options.AddArgument "--disable-features=PasswordGeneration"
+    options.AddArgument "--disable-features=PrintPreview"
+    options.AddArgument "--disable-features=Translate"
+    options.AddArgument "--disable-features=WebUIDarkMode"
+
     options.SetLoggingPreference(LogType.Browser, LogLevel.Off)
+
+    let service = ChromeDriverService.CreateDefaultService()
+    service.SuppressInitialDiagnosticInformation <- true
+    service.HideCommandPromptWindow <- true
+    service.EnableVerboseLogging <- false
+    service.LogPath <- "NUL"
+
     let logger: ILogger = LoggerContext.GetLoggerByName "Scraper"
     logger.LogInformation "Creating ChromeDriver with headless configuration..."
-    let driver = new ChromeDriver(options)
+    let driver = new ChromeDriver(service, options)
     logger.LogInformation "ChromeDriver created successfully"
     driver
 
@@ -82,7 +120,6 @@ let ExtractStockDataFromTable (rows: ReadOnlyCollection<IWebElement>) =
                 let cells = row.FindElements(By.TagName("td"))
                 logger.LogDebug("Row {Index}: Found {CellCount} cells", index, cells.Count)
                 
-                // Log all cells for debugging
                 for i in 0..(cells.Count - 1) do
                     let cellText = cells.[i].Text.Trim()
                     logger.LogDebug("Row {Index} Cell {CellIndex}: '{CellText}'", index, i, cellText)
@@ -90,8 +127,8 @@ let ExtractStockDataFromTable (rows: ReadOnlyCollection<IWebElement>) =
                 if cells.Count >= 7 then
                     let symbol = cells.[0].Text.Trim()
                     let name = cells.[1].Text.Trim()
-                    let priceText = cells.[3].Text.Trim()  // CURRENT column
-                    let weightText = cells.[6].Text.Trim() // IDX WTG (%) column
+                    let priceText = cells.[3].Text.Trim()
+                    let weightText = cells.[6].Text.Trim()
                     
                     logger.LogDebug("Row {Index}: Symbol='{Symbol}', Name='{Name}', Price='{Price}', Weight='{Weight}'", 
                         index, symbol, name, priceText, weightText)
@@ -151,7 +188,7 @@ let ScrapeIndexDataAsync (driver: IWebDriver) (url: string) (code: string) = asy
                 logger.LogDebug("After click - Current page URL: {Url}", driver.Url)
                 
                 logger.LogDebug("Looking for table length selector...")
-                let! selectElement = WaitForElementAsync driver (By.Name "DataTables_Table_1_length") 15.0
+                let! selectElement = WaitForElementAsync driver (By.CssSelector "select[name*='DataTables_Table_'][name*='_length']") 15.0
                 
                 match selectElement with
                 | Error err -> 
@@ -165,46 +202,126 @@ let ScrapeIndexDataAsync (driver: IWebDriver) (url: string) (code: string) = asy
                     logger.LogDebug("Waiting 3 seconds for table to reload...")
                     do! Async.Sleep 3000
 
-                    
-                    logger.LogDebug("Looking for data table...")
-                    let! tableElement = WaitForElementAsync driver (By.Id "DataTables_Table_1") 15.0
-                    
-                    match tableElement with
-                    | Error err -> 
-                        logger.LogError("Failed to find data table")
-                        return Error err
-                    | Ok table ->
-                        logger.LogDebug("Found data table, extracting rows...")
+                    let extractCurrentPageData () = async {
+                        logger.LogDebug("Looking for data table...")
+                        let! tableElement = WaitForElementAsync driver (By.CssSelector "table[id*='DataTables_Table_']") 15.0
                         
-                        // Extract and log table headers
-                        let headers = table.FindElements(By.CssSelector("thead th"))
-                        logger.LogDebug("Table headers found: {Count} columns", headers.Count)
-                        for i in 0..(headers.Count - 1) do
-                            let headerText = headers.[i].Text.Trim()
-                            logger.LogDebug("🔍 Table Header {Index}: '{HeaderText}'", i, headerText)
-                        
-                        let rows = table.FindElements(By.CssSelector("tbody tr"))
-                        logger.LogInformation("Found {Count} rows in table", rows.Count)
-                        let htmlLength = table.GetAttribute("outerHTML").Length
-                        let maxPreviewLength = 500
-                        let previewLength = min maxPreviewLength htmlLength
-                        logger.LogDebug("Table HTML structure: {Html}", table.GetAttribute("outerHTML").Substring(0, previewLength))
-                        
-                        logger.LogDebug("Extracting stock data from table rows...")
-                        let stockDataResult = ExtractStockDataFromTable rows
-                        
-                        match stockDataResult with
+                        match tableElement with
                         | Error err -> 
-                            logger.LogError("Failed to extract stock data: {Error}", err.ToString())
+                            logger.LogError("Failed to find data table")
                             return Error err
-                        | Ok stockData ->
-                            logger.LogInformation("Successfully extracted {Count} stock records", List.length stockData)
-                            let stockCount = List.length stockData
-                            let maxCount = 3
-                            let takeCount = min maxCount stockCount
-                            let firstFew = stockData |> List.take takeCount
-                            logger.LogDebug("First few records: {Records}", firstFew)
-                            return Ok stockData
+                        | Ok table ->
+                            logger.LogDebug("Found data table, extracting rows...")
+                            
+                            let headers = table.FindElements(By.CssSelector("thead th"))
+                            logger.LogDebug("Table headers found: {Count} columns", headers.Count)
+                            for i in 0..(headers.Count - 1) do
+                                let headerText = headers.[i].Text.Trim()
+                                logger.LogDebug("🔍 Table Header {Index}: '{HeaderText}'", i, headerText)
+                            
+                            let rows = table.FindElements(By.CssSelector("tbody tr"))
+                            logger.LogInformation("Found {Count} rows in current page", rows.Count)
+                            
+                            logger.LogDebug("Extracting stock data from table rows...")
+                            let stockDataResult = ExtractStockDataFromTable rows
+                            
+                            match stockDataResult with
+                            | Error err -> 
+                                logger.LogError("Failed to extract stock data: {Error}", err.ToString())
+                                return Error err
+                            | Ok stockData ->
+                                logger.LogInformation("Successfully extracted {Count} stock records from current page", List.length stockData)
+                                return Ok stockData
+                    }
+
+                    let getPaginationInfo () = async {
+                        let! infoElement = WaitForElementAsync driver (By.CssSelector "div[id*='DataTables_Table_'][id*='_info']") 10.0
+                        match infoElement with
+                        | Error err -> 
+                            logger.LogWarning("Could not find pagination info: {Error}", err.ToString())
+                            return None
+                        | Ok element ->
+                            let infoText = element.Text.Trim()
+                            logger.LogDebug("Pagination info: {Info}", infoText)
+                            
+                            let pattern = @"Showing (\d+) to (\d+) of (\d+) entries"
+                            let regexMatch = System.Text.RegularExpressions.Regex.Match(infoText, pattern)
+                            if regexMatch.Success then
+                                let currentStart = int regexMatch.Groups.[1].Value
+                                let currentEnd = int regexMatch.Groups.[2].Value
+                                let totalEntries = int regexMatch.Groups.[3].Value
+                                let currentPage = (currentStart - 1) / 100 + 1
+                                let totalPages = (totalEntries + 99) / 100
+                                
+                                logger.LogInformation("Page {CurrentPage} of {TotalPages} (entries {Start}-{End} of {Total})", 
+                                    currentPage, totalPages, currentStart, currentEnd, totalEntries)
+                                
+                                return Some (currentPage, totalPages, currentStart, currentEnd, totalEntries)
+                            else
+                                logger.LogWarning("Could not parse pagination info: {Info}", infoText)
+                                return None
+                    }
+
+                    let navigateToNextPage () = async {
+                        let! nextButton = WaitForElementAsync driver (By.CssSelector "a[id*='DataTables_Table_'][id*='_next']") 10.0
+                        match nextButton with
+                        | Error err -> 
+                            logger.LogWarning("Could not find next button: {Error}", err.ToString())
+                            return false
+                        | Ok element ->
+                            let isDisabled = element.GetAttribute("class").Contains("disabled")
+                            if isDisabled then
+                                logger.LogInformation("Next button is disabled - reached last page")
+                                return false
+                            else
+                                logger.LogInformation("Clicking next page button...")
+                                let! clickResult = ExecuteScriptAsync<obj> driver "arguments[0].click();" [| element |]
+                                match clickResult with
+                                | Error err -> 
+                                    logger.LogError("Failed to click next button: {Error}", err.ToString())
+                                    return false
+                                | Ok _ ->
+                                    logger.LogDebug("Successfully clicked next button, waiting for page to load...")
+                                    do! Async.Sleep 2000
+                                    return true
+                    }
+
+                    let rec collectAllPagesData allData = async {
+                        let! pageData = extractCurrentPageData()
+                        match pageData with
+                        | Error err -> return Error err
+                        | Ok currentPageData ->
+                            let updatedData = allData @ currentPageData
+                            logger.LogInformation("Collected {TotalCount} records so far", List.length updatedData)
+                            
+                            let! paginationInfo = getPaginationInfo()
+                            match paginationInfo with
+                            | None -> 
+                                logger.LogWarning("Could not get pagination info, assuming single page")
+                                return Ok updatedData
+                            | Some (currentPage, totalPages, _, _, _) ->
+                                if currentPage >= totalPages then
+                                    logger.LogInformation("Reached last page ({CurrentPage}/{TotalPages}), collection complete", currentPage, totalPages)
+                                    return Ok updatedData
+                                else
+                                    logger.LogInformation("Moving to next page ({CurrentPage}/{TotalPages})", currentPage, totalPages)
+                                    let! nextPageSuccess = navigateToNextPage()
+                                    if nextPageSuccess then
+                                        return! collectAllPagesData updatedData
+                                    else
+                                        logger.LogWarning("Failed to navigate to next page, stopping collection")
+                                        return Ok updatedData
+                    }
+
+                    let! allStockData = collectAllPagesData []
+                    
+                    match allStockData with
+                    | Error err -> return Error err
+                    | Ok stockData ->
+                        logger.LogInformation("Successfully extracted {Count} total stock records from all pages", List.length stockData)
+                        let firstFew = stockData |> List.take (min 3 (List.length stockData))
+                        logger.LogDebug("First few records: {Records}", firstFew)
+                        return Ok stockData
     }
     
     try
@@ -376,7 +493,7 @@ let ConstructIndexCache (forceRefresh: bool) (indexCode: string) = async {
     
     let operation = async {
         logger.LogInformation("🚀 Starting ConstructIndexCache for {IndexCode} (forceRefresh: {ForceRefresh})", indexCode, forceRefresh)
-        use driver = CreateChromeDriver ()
+        use driver = CreateChromeDriver()
         
         let url = "https://dps.psx.com.pk/indices"
         logger.LogInformation("🎯 Target URL: {Url}, Index Code: {Code}", url, indexCode)
@@ -393,7 +510,6 @@ let ConstructIndexCache (forceRefresh: bool) (indexCode: string) = async {
                 |> List.map (fun data -> 
                     { Symbol = data.Symbol; Weight = data.Weight })
             
-            // Convert to StockRecord list from index data
             let indexStockRecords = 
                 stockData 
                 |> List.map (fun data -> 
@@ -408,7 +524,7 @@ let ConstructIndexCache (forceRefresh: bool) (indexCode: string) = async {
             let portfolioOnlySymbols = 
                 currentPortfolio 
                 |> List.filter (fun p -> not (Set.contains p.Symbol indexSymbols))
-                |> List.map (fun p -> p.Symbol)
+                |> List.map _.Symbol
             
             logger.LogDebug("🔍 Found {Count} stocks in portfolio but not in index: {Symbols}", 
                 List.length portfolioOnlySymbols, String.concat ", " portfolioOnlySymbols)

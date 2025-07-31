@@ -54,7 +54,7 @@ let displayMenu () =
             .AddRow("1", "Show Index and Current Portfolio")
             .AddRow("2", "Import Current Portfolio from JSON")
             .AddRow("3", "Rebalance Index with Cash (optionally show commission)")
-            .AddRow("4", "Rebalance Current Portfolio with Cash (optionally show)")
+            .AddRow("4", "Rebalance Current Portfolio with Cash (optionally show commision)")
             .AddRow("5", sprintf "Get Index and Stock Data%s" selectedIndexText)
             .AddRow("6", "Show Performance Metrics")
             .AddRow("7", "Clear Cache")
@@ -136,7 +136,6 @@ let handleGetData () = async {
     let logger: ILogger = LoggerContext.GetLoggerByName "Menu"
     logger.LogDebug("🔍 Starting data fetch operation...")
     
-    // First, show indices table and let user select
     let! selectedIndex = showIndicesAndSelect()
     
     match selectedIndex with
@@ -148,10 +147,8 @@ let handleGetData () = async {
         logger.LogDebug("✅ Data fetch operation completed")
         printErrors result
     | None ->
-        AnsiConsole.MarkupLine "\n[yellow]⚠️ No index selected, using default: KSE30[/]"
-        let! result = ConstructIndexCache true "KSE30"
-        logger.LogDebug("✅ Data fetch operation completed")
-        printErrors result
+        AnsiConsole.MarkupLine "\n[yellow]❌ Operation cancelled by user.[/]"
+        logger.LogDebug("❌ Data fetch operation cancelled by user")
     
     return ()
 } 
